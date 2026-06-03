@@ -1,0 +1,311 @@
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+
+type Language = 'en' | 'ru'
+type Theme = 'light' | 'dark'
+
+const translations = {
+  en: {
+    appTitle: 'Face Recognition',
+    appSubtitle: 'Local Actor Identification',
+    modelReady: 'Model Ready',
+    loadingModel: 'Loading Model...',
+    actors: 'actors',
+    vectors: 'vectors',
+    uploadTab: 'Upload & Identify',
+    actorsTab: 'Actor Database',
+    uploadTitle: 'Identify Actors from Photos',
+    uploadSubtitle:
+      'Upload photos to detect faces and identify actors from the local database. All processing happens locally - your images never leave your computer.',
+    footerVersion: 'Face Recognition Service v1.0',
+    footerPrivacy: 'All processing is local and private',
+    language: 'Language',
+    theme: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
+    privacyMode: 'Privacy mode',
+    privacyModeOn: 'Hide images',
+    privacyModeOff: 'Show images',
+    results: 'Results',
+    clear: 'Clear',
+    noConfidentMatches: 'No confident matches found',
+    closestBelowThreshold: 'Closest below threshold',
+    otherCloseCandidates: 'Other close candidates',
+    copied: 'Copied',
+    copyName: 'Copy name',
+    databaseReference: 'Database reference',
+    uploadedPhoto: 'Uploaded photo',
+    selectedInput: 'Selected input',
+    noImageAvailable: 'No image available',
+    faces: 'face',
+    facesPlural: 'faces',
+    rejectedFiles: 'Some files were rejected. Please upload images only.',
+    uploadFailed: 'Upload failed',
+    processing: 'Processing...',
+    dropHere: 'Drop your images here',
+    dragDrop: 'Drag & drop images here',
+    browseFiles: 'browse files',
+    search: 'Search',
+    upToSize: 'Up to 50MB',
+    maxFiles: 'Max 20 files',
+    actorDatabase: 'Actor Database',
+    addActor: 'Add Actor',
+    searchActors: 'Search actors...',
+    noActorsSearch: 'No actors match your search',
+    noActors: 'No actors in database yet',
+    addActorHint: 'Click "Add Actor" to get started',
+    addNewActor: 'Add New Actor',
+    name: 'Name',
+    fullName: 'Full name',
+    birthYear: 'Birth Year',
+    gender: 'Gender',
+    select: 'Select',
+    male: 'Male',
+    female: 'Female',
+    other: 'Other',
+    tagsComma: 'Tags (comma-separated)',
+    biography: 'Biography',
+    filmography: 'Filmography',
+    add: 'Add Actor',
+    adding: 'Adding...',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    upload: 'Upload',
+    addReferencePhoto: 'Add Reference Photo',
+    uploadClearPhoto: 'Upload a clear photo of',
+    indexNotice: 'New reference photos are used after rebuilding the face index.',
+    localActorRecord: 'Local actor record',
+    stashdbId: 'StashDB ID',
+    noReferencePhotos: 'No reference photos',
+    of: 'of',
+    birthdate: 'Birthdate',
+    career: 'Career',
+    height: 'Height',
+    measurements: 'Measurements',
+    scenes: 'Scenes',
+    breastType: 'Breast type',
+    country: 'Country',
+    ethnicity: 'Ethnicity',
+    eyeColor: 'Eye color',
+    hairColor: 'Hair color',
+    photos: 'Photos',
+    aliases: 'Aliases',
+    notableWorks: 'Notable works',
+    links: 'Links',
+    tattoos: 'Tattoos',
+    piercings: 'Piercings',
+    tags: 'Tags',
+    active: 'Active',
+    until: 'Until',
+    born: 'Born',
+    confirmDelete: 'Are you sure you want to delete this actor?',
+    failedLoadActors: 'Failed to load actors',
+    failedAddActor: 'Failed to add actor',
+    failedDeleteActor: 'Failed to delete actor',
+    failedLoadActorDetails: 'Failed to load actor details',
+    failedAddImage: 'Failed to add image',
+    stashdbTab: 'Import StashDB',
+    stashdbSearchPlaceholder: 'Search performers on StashDB...',
+    import: 'Import',
+    importing: 'Importing...',
+    importedSuccess: 'Imported successfully!',
+    imagesDownloaded: 'Images downloaded',
+    facesIndexed: 'Faces indexed',
+    imageCountToDownload: 'Number of reference images',
+    stashdbTabLabel: 'StashDB',
+    assignFace: 'Assign face',
+    assigningFace: 'Assigning...',
+    assignSuccess: 'Face assigned successfully!',
+    assignToNew: 'Create new actor',
+    assignToExisting: 'Link to existing actor',
+    findExistingActor: 'Search local actor database...',
+    save: 'Save',
+  },
+  ru: {
+    appTitle: 'Распознавание лиц',
+    appSubtitle: 'Локальное определение актрис и актеров',
+    modelReady: 'Модель готова',
+    loadingModel: 'Модель загружается...',
+    actors: 'актеров',
+    vectors: 'векторов',
+    uploadTab: 'Загрузка и поиск',
+    actorsTab: 'База актеров',
+    uploadTitle: 'Определение актеров по фото',
+    uploadSubtitle:
+      'Загрузите фото, чтобы найти лица и сравнить их с локальной базой. Обработка идет локально, изображения не уходят с компьютера.',
+    footerVersion: 'Face Recognition Service v1.0',
+    footerPrivacy: 'Вся обработка локальная и приватная',
+    language: 'Язык',
+    theme: 'Тема',
+    light: 'Светлая',
+    dark: 'Темная',
+    privacyMode: 'Приватный режим',
+    privacyModeOn: 'Скрыть фото',
+    privacyModeOff: 'Показать фото',
+    results: 'Результаты',
+    clear: 'Очистить',
+    noConfidentMatches: 'Нет уверенных совпадений',
+    closestBelowThreshold: 'Ближайшие ниже порога',
+    otherCloseCandidates: 'Другие близкие кандидаты',
+    copied: 'Скопировано',
+    copyName: 'Скопировать имя',
+    databaseReference: 'Фото из базы',
+    uploadedPhoto: 'Загруженное фото',
+    selectedInput: 'Выбранный файл',
+    noImageAvailable: 'Фото недоступно',
+    faces: 'лицо',
+    facesPlural: 'лиц',
+    rejectedFiles: 'Некоторые файлы отклонены. Загружайте только изображения.',
+    uploadFailed: 'Загрузка не удалась',
+    processing: 'Обработка...',
+    dropHere: 'Отпустите изображения здесь',
+    dragDrop: 'Перетащите изображения сюда',
+    browseFiles: 'выбрать файлы',
+    search: 'Поиск',
+    upToSize: 'До 50MB',
+    maxFiles: 'До 20 файлов',
+    actorDatabase: 'База актеров',
+    addActor: 'Добавить актера',
+    searchActors: 'Поиск актеров...',
+    noActorsSearch: 'Поиск не дал результатов',
+    noActors: 'В базе пока нет актеров',
+    addActorHint: 'Нажмите "Добавить актера", чтобы начать',
+    addNewActor: 'Новый актер',
+    name: 'Имя',
+    fullName: 'Полное имя',
+    birthYear: 'Год рождения',
+    gender: 'Пол',
+    select: 'Выбрать',
+    male: 'Мужской',
+    female: 'Женский',
+    other: 'Другое',
+    tagsComma: 'Теги через запятую',
+    biography: 'Биография',
+    filmography: 'Фильмография',
+    add: 'Добавить',
+    adding: 'Добавление...',
+    cancel: 'Отмена',
+    delete: 'Удалить',
+    upload: 'Загрузить',
+    addReferencePhoto: 'Добавить reference-фото',
+    uploadClearPhoto: 'Загрузите четкое фото для',
+    indexNotice: 'Новое reference-фото начнет использоваться после пересборки face index.',
+    localActorRecord: 'Локальная запись',
+    stashdbId: 'StashDB ID',
+    noReferencePhotos: 'Reference-фото нет',
+    of: 'из',
+    birthdate: 'Дата рождения',
+    career: 'Карьера',
+    height: 'Рост',
+    measurements: 'Параметры',
+    scenes: 'Сцены',
+    breastType: 'Тип груди',
+    country: 'Страна',
+    ethnicity: 'Этничность',
+    eyeColor: 'Цвет глаз',
+    hairColor: 'Цвет волос',
+    photos: 'Фото',
+    aliases: 'Алиасы',
+    notableWorks: 'Заметные работы',
+    links: 'Ссылки',
+    tattoos: 'Татуировки',
+    piercings: 'Пирсинг',
+    tags: 'Теги',
+    active: 'Активна',
+    until: 'До',
+    born: 'Рождена',
+    confirmDelete: 'Удалить этого актера и его фото?',
+    failedLoadActors: 'Не удалось загрузить актеров',
+    failedAddActor: 'Не удалось добавить актера',
+    failedDeleteActor: 'Не удалось удалить актера',
+    failedLoadActorDetails: 'Не удалось загрузить детали актера',
+    failedAddImage: 'Не удалось добавить фото',
+    stashdbTab: 'Импорт StashDB',
+    stashdbSearchPlaceholder: 'Поиск исполнителей на StashDB...',
+    import: 'Импортировать',
+    importing: 'Импорт...',
+    importedSuccess: 'Успешно импортировано!',
+    imagesDownloaded: 'Скачано фото',
+    facesIndexed: 'Распознано лиц',
+    imageCountToDownload: 'Количество reference-фото',
+    stashdbTabLabel: 'StashDB',
+    assignFace: 'Привязать лицо',
+    assigningFace: 'Привязка...',
+    assignSuccess: 'Лицо успешно привязано!',
+    assignToNew: 'Создать нового актера',
+    assignToExisting: 'Привязать к существующему',
+    findExistingActor: 'Поиск по локальной базе...',
+    save: 'Сохранить',
+  },
+} as const
+
+type TranslationKey = keyof typeof translations.en
+
+interface UiPreferences {
+  language: Language
+  theme: Theme
+  privacyMode: boolean
+  setLanguage: (language: Language) => void
+  setTheme: (theme: Theme) => void
+  setPrivacyMode: (enabled: boolean) => void
+  t: (key: TranslationKey) => string
+}
+
+const UiPreferencesContext = createContext<UiPreferences | null>(null)
+
+function storedLanguage(): Language {
+  const value = localStorage.getItem('frs-language')
+  return value === 'ru' || value === 'en' ? value : 'en'
+}
+
+function storedTheme(): Theme {
+  const value = localStorage.getItem('frs-theme')
+  return value === 'dark' || value === 'light' ? value : 'light'
+}
+
+function storedPrivacyMode(): boolean {
+  return localStorage.getItem('frs-privacy-mode') === 'true'
+}
+
+export function UiPreferencesProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(storedLanguage)
+  const [theme, setThemeState] = useState<Theme>(storedTheme)
+  const [privacyMode, setPrivacyModeState] = useState<boolean>(storedPrivacyMode)
+
+  useEffect(() => {
+    localStorage.setItem('frs-language', language)
+  }, [language])
+
+  useEffect(() => {
+    localStorage.setItem('frs-theme', theme)
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('frs-privacy-mode', String(privacyMode))
+    document.documentElement.classList.toggle('privacy-mode', privacyMode)
+  }, [privacyMode])
+
+  const value = useMemo<UiPreferences>(
+    () => ({
+      language,
+      theme,
+      privacyMode,
+      setLanguage: setLanguageState,
+      setTheme: setThemeState,
+      setPrivacyMode: setPrivacyModeState,
+      t: (key) => translations[language][key] ?? translations.en[key],
+    }),
+    [language, privacyMode, theme],
+  )
+
+  return <UiPreferencesContext.Provider value={value}>{children}</UiPreferencesContext.Provider>
+}
+
+export function useUiPreferences() {
+  const context = useContext(UiPreferencesContext)
+  if (!context) {
+    throw new Error('useUiPreferences must be used inside UiPreferencesProvider')
+  }
+  return context
+}

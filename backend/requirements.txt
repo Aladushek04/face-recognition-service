@@ -1,0 +1,29 @@
+# Face Recognition Service - Backend Dependencies
+
+# Core web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.6.1
+
+# Face recognition
+insightface==0.7.3
+onnxruntime-gpu
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==11.0.0
+
+# Vector search
+faiss-cpu==1.9.0
+
+# Database (sqlite3 is built into Python — no pip install needed)
+
+# Utilities
+python-dotenv==1.0.1
+aiofiles==24.1.0
+filetype==1.2.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+aiohttp>=3.9.0
