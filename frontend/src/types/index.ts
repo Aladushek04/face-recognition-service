@@ -89,6 +89,7 @@ export interface Video {
   error_message: string | null
   progress?: number
   stashdb_scene_id?: string | null
+  stashdb_performers?: string[]
   created_at: string
   updated_at: string
   actors?: Array<{ id: number; name: string }>
@@ -104,4 +105,3 @@ export interface VideoDetection {
   bbox: number[]
   confidence: number
 }
-

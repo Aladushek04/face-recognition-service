@@ -80,6 +80,7 @@ def init_db() -> sqlite3.Connection:
             size_bytes INTEGER,
             status TEXT DEFAULT 'unprocessed',
             error_message TEXT,
+            stashdb_performers TEXT DEFAULT '[]',
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -124,6 +125,7 @@ def init_db() -> sqlite3.Connection:
     _ensure_column(conn, "actors", "stashdb_urls", "TEXT DEFAULT '[]'")
     _ensure_column(conn, "videos", "progress", "INTEGER DEFAULT 0")
     _ensure_column(conn, "videos", "stashdb_scene_id", "TEXT")
+    _ensure_column(conn, "videos", "stashdb_performers", "TEXT DEFAULT '[]'")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_actors_stashdb_id ON actors(stashdb_id)")
 
     conn.commit()

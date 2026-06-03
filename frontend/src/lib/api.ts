@@ -408,6 +408,7 @@ export async function linkStashdb(
     title: string
     studio: string | null
     cover_url: string | null
+    performers?: string[]
   }
 ): Promise<{ status: string; scene_id: string; cover_downloaded: boolean }> {
   const response = await fetch(`${API_BASE}/videos/${id}/link-stashdb`, {
@@ -419,6 +420,32 @@ export async function linkStashdb(
   })
   if (!response.ok) {
     throw await responseError(response, 'Failed to link StashDB scene')
+  }
+  return response.json()
+}
+
+export async function linkStashdbByUrl(
+  id: number,
+  sceneUrl: string,
+): Promise<{
+  status: string
+  scene_id: string
+  title: string
+  studio: string | null
+  date: string | null
+  cover_url: string | null
+  cover_downloaded: boolean
+  performers: string[]
+}> {
+  const response = await fetch(`${API_BASE}/videos/${id}/link-stashdb-url`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ scene_url: sceneUrl }),
+  })
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to link StashDB scene URL')
   }
   return response.json()
 }

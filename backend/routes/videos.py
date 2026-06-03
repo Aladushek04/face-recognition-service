@@ -14,6 +14,22 @@ from config import settings
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
+
+def _decode_json_list(value: object) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed]
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
 @router.get("")
 def list_videos(
     search: Optional[str] = None,
@@ -55,6 +71,7 @@ def list_videos(
         result_list = []
         for video in videos:
             v_dict = dict(video)
+            v_dict["stashdb_performers"] = _decode_json_list(v_dict.get("stashdb_performers"))
             
             # Fetch distinct actors detected in this video
             actors = conn.execute(
@@ -99,6 +116,7 @@ def get_video(video_id: int):
             formatted_detections.append(det_dict)
             
         video_dict = dict(video)
+        video_dict["stashdb_performers"] = _decode_json_list(video_dict.get("stashdb_performers"))
         video_dict["detections"] = formatted_detections
         
         # Extract unique actors found in detections
@@ -212,7 +230,7 @@ def process_video(video_id: int, background_tasks: BackgroundTasks):
             return {"status": "already_processing", "video_id": video_id}
             
         # Update status and clear any existing detections
-        conn.execute("UPDATE videos SET status = 'processing', error_message = NULL WHERE id = ?", (video_id,))
+        conn.execute("UPDATE videos SET status = 'processing', error_message = NULL, progress = 0 WHERE id = ?", (video_id,))
         conn.execute("DELETE FROM video_detections WHERE video_id = ?", (video_id,))
         conn.commit()
         
@@ -274,26 +292,32 @@ query QueryScenes($input: SceneQueryInput!) {
 }
 """
 
-concurrent_limit = settings.concurrent_video_limit
-analysis_semaphore = threading.Semaphore(concurrent_limit)
+QUERY_FIND_SCENE = """
+query FindScene($id: ID!) {
+  findScene(id: $id) {
+    id
+    title
+    date
+    studio {
+      id
+      name
+    }
+    images {
+      url
+    }
+    performers {
+      performer {
+        id
+        name
+      }
+    }
+  }
+}
+"""
 
 def batch_process_unprocessed(db_path_str: str):
     db_path = Path(db_path_str)
     processor = VideoProcessor()
-    
-    threads = []
-    
-    def worker(video_id: int, filepath: str):
-        with analysis_semaphore:
-            try:
-                processor.process(video_id, filepath, str(db_path))
-            except Exception as e:
-                with sqlite3.connect(db_path) as conn:
-                    conn.execute(
-                        "UPDATE videos SET status = 'failed', error_message = ?, updated_at = datetime('now') WHERE id = ?",
-                        (str(e), video_id)
-                    )
-                    conn.commit()
 
     while True:
         with sqlite3.connect(db_path) as conn:
@@ -304,23 +328,56 @@ def batch_process_unprocessed(db_path_str: str):
             
         if not video:
             break
-            
-        # Set status to processing immediately
+
         with sqlite3.connect(db_path) as conn:
             conn.execute("UPDATE videos SET status = 'processing', error_message = NULL, progress = 0 WHERE id = ?", (video["id"],))
             conn.commit()
-            
-        t = threading.Thread(target=worker, args=(video["id"], video["filepath"]), daemon=True)
-        t.start()
-        threads.append(t)
-        
-    for t in threads:
-        t.join()
+
+        try:
+            processor.process(video["id"], video["filepath"], str(db_path))
+        except Exception as e:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    "UPDATE videos SET status = 'failed', error_message = ?, updated_at = datetime('now') WHERE id = ?",
+                    (str(e), video["id"])
+                )
+                conn.commit()
+
+
+def reset_stale_processing_videos(db_path: Path, stale_after_minutes: int = 30) -> int:
+    """Move abandoned processing rows back to failed so they can be queued again."""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            """UPDATE videos
+               SET status = 'failed',
+                   error_message = 'Processing was interrupted or abandoned.',
+                   updated_at = datetime('now')
+               WHERE status = 'processing'
+                 AND updated_at < datetime('now', ?)""",
+            (f"-{stale_after_minutes} minutes",)
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def reset_interrupted_processing_videos(db_path: Path) -> int:
+    """Recover processing rows left behind by a previous backend process."""
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(
+            """UPDATE videos
+               SET status = 'failed',
+                   error_message = 'Processing was interrupted by a service restart.',
+                   updated_at = datetime('now')
+               WHERE status = 'processing'"""
+        )
+        conn.commit()
+        return cursor.rowcount
 
 @router.post("/process-unprocessed")
 def process_unprocessed_videos(background_tasks: BackgroundTasks):
     """Start background sequential processing for all unprocessed/failed videos."""
     db_path = get_db_path()
+    reset_count = reset_stale_processing_videos(db_path)
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         unprocessed = conn.execute(
@@ -328,10 +385,10 @@ def process_unprocessed_videos(background_tasks: BackgroundTasks):
         ).fetchall()
         
     if not unprocessed:
-        return {"status": "no_videos_to_process", "count": 0}
+        return {"status": "no_videos_to_process", "count": 0, "reset_stale": reset_count}
         
     background_tasks.add_task(batch_process_unprocessed, str(db_path))
-    return {"status": "started", "count": len(unprocessed)}
+    return {"status": "started", "count": len(unprocessed), "reset_stale": reset_count}
 
 @router.post("/{video_id}/rename")
 def rename_video(video_id: int, new_filename: str = Body(..., embed=True)):
@@ -408,7 +465,7 @@ def match_stashdb_scene(video_id: int):
 
     # Use the smart search pipeline
     queries = _build_search_queries(filename, detected_actors, all_db_actors)
-    print(f"[SmartMatch] Video '{filename}' → {len(queries)} queries: {queries}")
+    print(f"[SmartMatch] Video '{filename}' -> {len(queries)} queries: {queries}")
 
     seen_ids: set[str] = set()
     all_scenes: list[dict] = []
@@ -472,8 +529,12 @@ def match_stashdb_scene(video_id: int):
 
     with sqlite3.connect(db_path) as conn:
         conn.execute(
-            "UPDATE videos SET stashdb_scene_id = ?, updated_at = datetime('now') WHERE id = ?",
-            (scene_id, video_id)
+            "UPDATE videos SET stashdb_scene_id = ?, stashdb_performers = ?, updated_at = datetime('now') WHERE id = ?",
+            (
+                scene_id,
+                json.dumps([p["performer"]["name"] for p in scene.get("performers") or []]),
+                video_id,
+            )
         )
         conn.commit()
 
@@ -542,6 +603,26 @@ def _normalize(text: str) -> str:
 def _clean_name(name: str) -> str:
     """Reduce an actor name to comparable lowercase alpha form."""
     return re.sub(r'[^a-z]', '', name.lower())
+
+
+_STOPWORDS = {"the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "with"}
+
+
+def _name_token_set(names: list[str]) -> set[str]:
+    """Return normalized word tokens from performer names."""
+    tokens: set[str] = set()
+    for name in names:
+        tokens.update(_normalize(name).split())
+    return tokens
+
+
+def _add_unique_query(queries: list[str], query: str) -> None:
+    """Append a cleaned search query if it is meaningful and not already present."""
+    normalized = ' '.join(query.split())
+    if len(normalized) < 3:
+        return
+    if normalized.lower() not in {q.lower() for q in queries}:
+        queries.append(normalized)
 
 
 def _parse_filename(filename: str) -> dict:
@@ -638,11 +719,12 @@ def calculate_match_score(
     Uses multiple signals: title overlap, performer match, studio match, date match.
     """
     parsed = _parse_filename(filename)
-    fn_tokens = set(parsed["tokens"])
+    actor_tokens = _name_token_set(detected_actors + scene_performers)
+    fn_tokens = set(parsed["tokens"]) - actor_tokens
 
     # ── Title overlap (Jaccard on meaningful tokens) ──
     title_norm = _normalize(scene_title or "")
-    title_tokens = set(title_norm.split()) - {"the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "with"}
+    title_tokens = set(title_norm.split()) - _STOPWORDS - actor_tokens
     
     text_score = 0.0
     if fn_tokens and title_tokens:
@@ -653,6 +735,8 @@ def calculate_match_score(
         union = fn_tokens.union(title_tokens)
         jaccard = len(intersection) / len(union) if union else 0.0
         text_score = (title_recall * 0.7 + jaccard * 0.3)
+        if title_recall == 1.0:
+            text_score = max(text_score, 0.95)
 
     # ── Studio match ──
     studio_score = 0.0
@@ -754,6 +838,85 @@ def _query_stashdb_scenes(search_text: str, per_page: int = 10) -> list[dict]:
         return []
 
 
+def _extract_stashdb_scene_id(scene_url: str) -> str:
+    """Extract a StashDB scene UUID from a pasted URL or raw ID."""
+    match = re.search(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        scene_url.strip(),
+    )
+    if not match:
+        raise HTTPException(status_code=400, detail="Could not find a StashDB scene ID in the pasted URL")
+    return match.group(0)
+
+
+def _fetch_stashdb_scene(scene_id: str) -> dict:
+    """Fetch a StashDB scene by ID."""
+    headers = {
+        "ApiKey": settings.stashdb_api_key,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    try:
+        resp = requests.post(
+            settings.stashdb_api_url,
+            json={"query": QUERY_FIND_SCENE, "variables": {"id": scene_id}},
+            headers=headers,
+            timeout=20,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Failed to communicate with StashDB: {str(e)}")
+
+    if payload.get("errors"):
+        raise HTTPException(status_code=502, detail=f"StashDB GraphQL errors: {payload['errors']}")
+
+    scene = (payload.get("data") or {}).get("findScene")
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found on StashDB")
+    return scene
+
+
+def _download_stashdb_cover(video_id: int, cover_url: Optional[str]) -> bool:
+    """Download a StashDB cover image into the local thumbnails directory."""
+    if not cover_url:
+        return False
+    if not cover_url.startswith("http"):
+        cover_url = f"https:{cover_url}"
+
+    thumbnails_dir = Path(settings.base_dir) / "thumbnails"
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
+    thumb_path = thumbnails_dir / f"{video_id}.jpg"
+
+    try:
+        img_res = requests.get(cover_url, stream=True, timeout=15)
+        img_res.raise_for_status()
+        with open(thumb_path, "wb") as f:
+            for chunk in img_res.iter_content(1024 * 64):
+                f.write(chunk)
+        return True
+    except Exception as e:
+        print(f"Failed to download StashDB cover image: {e}")
+        return False
+
+
+def _scene_response(scene: dict, cover_downloaded: bool) -> dict:
+    studio_name = scene.get("studio", {}).get("name") if scene.get("studio") else None
+    performers = [p["performer"]["name"] for p in scene.get("performers") or []]
+    images = scene.get("images") or []
+    cover_url = images[0].get("url") if images else None
+    return {
+        "status": "success",
+        "scene_id": scene["id"],
+        "title": scene.get("title"),
+        "studio": studio_name,
+        "date": scene.get("date"),
+        "cover_url": cover_url,
+        "cover_downloaded": cover_downloaded,
+        "performers": performers,
+    }
+
+
 def _build_search_queries(filename: str, detected_actors: list[str], all_db_actors: list[str]) -> list[str]:
     """
     Generate a list of search queries to try, ordered from most specific to broadest.
@@ -761,31 +924,32 @@ def _build_search_queries(filename: str, detected_actors: list[str], all_db_acto
     """
     parsed = _parse_filename(filename)
     tokens = parsed["tokens"]
-    queries = []
+    queries: list[str] = []
+    known_actor_names = detected_actors + all_db_actors
 
-    # 1. Full cleaned filename (all meaningful tokens)
-    if tokens:
-        full_query = ' '.join(tokens)
-        if len(full_query) >= 3:
-            queries.append(full_query)
+    _, title_tokens = _find_actor_tokens(tokens, known_actor_names)
+    title_tokens_no_stop = [token for token in title_tokens if token not in _STOPWORDS]
 
-    # 2. If we have detected actors — search by actor names + remaining title keywords
+    # StashDB scene text search behaves much better with title-only queries than
+    # with "performer + title" in one string. Score performers locally instead.
+    if title_tokens:
+        _add_unique_query(queries, ' '.join(title_tokens))
+    if title_tokens_no_stop and title_tokens_no_stop != title_tokens:
+        _add_unique_query(queries, ' '.join(title_tokens_no_stop))
+
+    # Full cleaned filename remains useful when it does not mix a recognized
+    # performer name with the title. StashDB text search often fails on that mix.
+    if tokens and title_tokens == tokens:
+        _add_unique_query(queries, ' '.join(tokens))
+
+    # If we have detected actors, keep a narrow title fallback and actor-only fallback.
     if detected_actors:
-        _, remaining = _find_actor_tokens(tokens, detected_actors + all_db_actors)
-        
-        # Actor names + remaining keywords
         actor_str = ' '.join(detected_actors)
-        remaining_str = ' '.join(remaining[:4])  # Limit remaining tokens
-        if remaining_str:
-            combined = f"{actor_str} {remaining_str}"
-            if combined not in queries:
-                queries.append(combined)
+        if title_tokens_no_stop:
+            _add_unique_query(queries, ' '.join(title_tokens_no_stop[:4]))
+        _add_unique_query(queries, actor_str)
 
-        # Just actor names (sometimes titles are very different from filenames)
-        if actor_str not in queries and len(actor_str) >= 3:
-            queries.append(actor_str)
-
-    # 3. Try extracting likely "proper names" from tokens (capitalised bigrams in original stem)
+    # Try extracting likely "proper names" from tokens (capitalised bigrams in original stem).
     stem_parts = re.sub(r'[_.\-\[\](){}]', ' ', Path(filename).stem).split()
     name_candidates = []
     i = 0
@@ -803,26 +967,19 @@ def _build_search_queries(filename: str, detected_actors: list[str], all_db_acto
         else:
             i += 1
 
-    if name_candidates:
+    if name_candidates and not detected_actors and not title_tokens_no_stop:
         name_query = ' '.join(name_candidates)
-        if name_query.lower() not in [q.lower() for q in queries] and len(name_query) >= 3:
-            queries.append(name_query)
+        _add_unique_query(queries, name_query)
 
-    # 4. Shorter keyword combos (first 3-4 tokens) — broadest fallback
-    if len(tokens) > 3:
-        short_query = ' '.join(tokens[:3])
-        if short_query not in queries and len(short_query) >= 3:
-            queries.append(short_query)
+    # Shorter keyword combos are broad fallbacks.
+    fallback_tokens = title_tokens_no_stop or tokens
+    if len(fallback_tokens) > 3:
+        _add_unique_query(queries, ' '.join(fallback_tokens[:3]))
 
-    # 5. If date was found, try date + actor or date + first tokens
+    # If date was found, try date + title tokens.
     if parsed["date_hint"]:
         date_clean = parsed["date_hint"].replace('.', '-')
-        if detected_actors:
-            date_query = f"{date_clean} {' '.join(detected_actors[:2])}"
-        else:
-            date_query = f"{date_clean} {' '.join(tokens[:2])}"
-        if date_query not in queries and len(date_query) >= 5:
-            queries.append(date_query)
+        _add_unique_query(queries, f"{date_clean} {' '.join(fallback_tokens[:2])}")
 
     return queries
 
@@ -865,7 +1022,7 @@ def search_stashdb_candidates(video_id: int):
 
     # Generate search queries
     queries = _build_search_queries(filename, detected_actors, all_db_actors)
-    print(f"[SmartSearch] Video '{filename}' → {len(queries)} queries: {queries}")
+    print(f"[SmartSearch] Video '{filename}' -> {len(queries)} queries: {queries}")
 
     # Run searches and collect unique results
     seen_ids: set[str] = set()
@@ -935,7 +1092,8 @@ def link_stashdb(
     scene_id: str = Body(..., embed=True),
     title: str = Body(..., embed=True),
     studio: Optional[str] = Body(None, embed=True),
-    cover_url: Optional[str] = Body(None, embed=True)
+    cover_url: Optional[str] = Body(None, embed=True),
+    performers: Optional[list[str]] = Body(None, embed=True),
 ):
     """Links a video to a specific StashDB scene, downloading the cover image if available."""
     db_path = get_db_path()
@@ -944,29 +1102,12 @@ def link_stashdb(
         if not exists:
             raise HTTPException(status_code=404, detail="Video not found")
 
-    cover_downloaded = False
-    if cover_url:
-        if not cover_url.startswith("http"):
-            cover_url = f"https:{cover_url}"
-        
-        thumbnails_dir = Path(settings.base_dir) / "thumbnails"
-        thumbnails_dir.mkdir(parents=True, exist_ok=True)
-        thumb_path = thumbnails_dir / f"{video_id}.jpg"
-        
-        try:
-            img_res = requests.get(cover_url, stream=True, timeout=15)
-            img_res.raise_for_status()
-            with open(thumb_path, "wb") as f:
-                for chunk in img_res.iter_content(1024 * 64):
-                    f.write(chunk)
-            cover_downloaded = True
-        except Exception as e:
-            print(f"Failed to download StashDB cover image: {e}")
+    cover_downloaded = _download_stashdb_cover(video_id, cover_url)
             
     with sqlite3.connect(db_path) as conn:
         conn.execute(
-            "UPDATE videos SET stashdb_scene_id = ?, updated_at = datetime('now') WHERE id = ?",
-            (scene_id, video_id)
+            "UPDATE videos SET stashdb_scene_id = ?, stashdb_performers = ?, updated_at = datetime('now') WHERE id = ?",
+            (scene_id, json.dumps(performers or []), video_id)
         )
         conn.commit()
         
@@ -975,6 +1116,39 @@ def link_stashdb(
         "scene_id": scene_id,
         "cover_downloaded": cover_downloaded
     }
+
+
+@router.post("/{video_id}/link-stashdb-url")
+def link_stashdb_url(
+    video_id: int,
+    scene_url: str = Body(..., embed=True),
+):
+    """Fetch a StashDB scene from a pasted URL/ID, link it, and download its cover."""
+    if not settings.stashdb_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="StashDB API Key is not set. Please add STASHDB_API_KEY to your .env file."
+        )
+
+    scene_id = _extract_stashdb_scene_id(scene_url)
+    scene = _fetch_stashdb_scene(scene_id)
+    images = scene.get("images") or []
+    cover_url = images[0].get("url") if images else None
+    cover_downloaded = _download_stashdb_cover(video_id, cover_url)
+    scene_data = _scene_response(scene, cover_downloaded)
+
+    db_path = get_db_path()
+    with sqlite3.connect(db_path) as conn:
+        exists = conn.execute("SELECT 1 FROM videos WHERE id = ?", (video_id,)).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Video not found")
+        conn.execute(
+            "UPDATE videos SET stashdb_scene_id = ?, stashdb_performers = ?, updated_at = datetime('now') WHERE id = ?",
+            (scene_id, json.dumps(scene_data["performers"]), video_id)
+        )
+        conn.commit()
+
+    return scene_data
 
 @router.post("/{video_id}/actors/{actor_id}", status_code=201)
 def add_actor_to_video(video_id: int, actor_id: int):

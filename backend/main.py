@@ -67,6 +67,10 @@ async def startup_event():
     """Initialize database and models on startup."""
     # Initialize database
     init_db()
+    from database.schema import get_db_path
+    reset_count = videos.reset_interrupted_processing_videos(get_db_path())
+    if reset_count:
+        print(f"[Startup] Reset {reset_count} interrupted video processing jobs")
 
     # Ensure directories exist
     settings.actors_dir.mkdir(parents=True, exist_ok=True)

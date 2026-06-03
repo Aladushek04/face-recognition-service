@@ -18,6 +18,7 @@ import {
   LayoutGrid,
   List,
   Download,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   getVideos,
@@ -30,6 +31,7 @@ import {
   renameVideo,
   searchStashdbCandidates,
   linkStashdb,
+  linkStashdbByUrl,
   addActorToVideo,
   removeActorFromVideo,
 } from '../lib/api'
@@ -203,6 +205,9 @@ export function VideosPanel() {
       setVideos((prev) =>
         prev.map((v) => (v.id === id ? { ...v, status: 'processing' } : v))
       )
+      setSelectedVideo((prev) =>
+        prev && prev.id === id ? { ...prev, status: 'processing', progress: 0, detections: [], actors: [] } : prev
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Processing start failed')
     } finally {
@@ -285,22 +290,29 @@ export function VideosPanel() {
         </div>
       </div>
 
-      {/* Messages */}
-      {error && (
-        <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-error-container bg-error-container px-4 py-3 text-sm font-medium text-on-error-container">
-          <span className="flex items-center gap-2">
-            <AlertCircle size={16} />
-            {error}
-          </span>
-          <button onClick={() => setError(null)} className="md-state-layer rounded-xl p-1 text-on-error-container hover:bg-surface" aria-label={t('cancel')}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-      )}
-
-      {scanMessage && (
-        <div className="mb-4 flex items-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3 text-sm font-semibold text-green-800">
-          <span>{scanMessage}</span>
+      {/* Floating notifications */}
+      {(error || scanMessage) && (
+        <div className="pointer-events-none fixed inset-x-4 top-20 z-50 flex justify-center" aria-live="polite">
+          {error ? (
+            <div className="md-glass pointer-events-auto flex w-full max-w-2xl items-start justify-between gap-3 rounded-[28px] border-error/30 bg-error-container/80 px-4 py-3 text-sm font-semibold text-on-error-container shadow-xl shadow-black/20 fade-in">
+              <span className="flex min-w-0 items-center gap-2">
+                <AlertCircle size={16} className="flex-shrink-0" />
+                <span className="break-words">{error}</span>
+              </span>
+              <button
+                onClick={() => setError(null)}
+                className="md-state-layer rounded-xl p-1 text-on-error-container hover:bg-surface/40"
+                aria-label={t('cancel')}
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <div className="md-glass pointer-events-auto flex w-full max-w-2xl items-center gap-2 rounded-[28px] border-success/30 bg-success-container/80 px-4 py-3 text-sm font-semibold text-on-success-container shadow-xl shadow-black/20 fade-in">
+              <span className="flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-success shadow-[0_0_0_5px_color-mix(in_srgb,var(--md-sys-color-success)_18%,transparent)]" />
+              <span className="min-w-0 break-words">{scanMessage}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -314,20 +326,47 @@ export function VideosPanel() {
           <div className="space-y-3">
             {videos
               .filter((v) => v.status === 'processing')
-              .map((video) => (
-                <div key={video.id} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold text-on-surface">
-                    <span className="truncate pr-4 font-bold">{video.filename}</span>
-                    <span className="text-primary-700 font-bold">{video.progress ?? 0}%</span>
+              .map((video, index) => {
+                const progress = video.progress ?? 0
+                const isActive = progress > 0 || index === 0
+
+                return (
+                  <div
+                    key={video.id}
+                    className={`rounded-xl border px-3 py-2 transition-colors ${
+                      isActive
+                        ? 'border-primary/30 bg-primary-container/20'
+                        : 'border-outline-variant/30 bg-surface-container-low/40'
+                    }`}
+                  >
+                    <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-on-surface">
+                      <span className="min-w-0 truncate font-bold">{video.filename}</span>
+                      <span className="flex flex-shrink-0 items-center gap-2">
+                        <span className={`rounded-chip px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                          isActive
+                            ? 'bg-primary-container text-primary-700'
+                            : 'bg-surface-container-highest text-on-surface-variant'
+                        }`}>
+                          {isActive ? (language === 'ru' ? 'Идет' : 'Active') : (language === 'ru' ? 'В очереди' : 'Queued')}
+                        </span>
+                        <span className="min-w-[34px] text-right font-extrabold text-primary-700">{progress}%</span>
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+                      {progress > 0 ? (
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary-500 via-primary-600 to-primary-500 shadow-[0_0_14px_color-mix(in_srgb,var(--md-sys-color-primary)_35%,transparent)] transition-all duration-500 ease-out"
+                          style={{ width: `${progress}%` }}
+                        />
+                      ) : isActive ? (
+                        <div className="absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-gradient-to-r from-transparent via-primary-500 to-transparent" />
+                      ) : (
+                        <div className="h-full w-1 rounded-full bg-outline-variant/50" />
+                      )}
+                    </div>
                   </div>
-                  <div className="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-primary h-full transition-all duration-300 ease-out"
-                      style={{ width: `${video.progress ?? 0}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                )
+              })}
           </div>
         </div>
       )}
@@ -547,14 +586,14 @@ export function VideosPanel() {
                           <Play size={12} />
                           <span>{labels.play}</span>
                         </button>
-                        {(video.status === 'unprocessed' || video.status === 'failed') && (
+                        {(video.status === 'unprocessed' || video.status === 'failed' || video.status === 'completed') && (
                           <button
                             onClick={() => handleProcess(video.id)}
                             disabled={isProcessing}
                             className="md-state-layer md-tonal-button h-8 px-3 text-xs font-semibold flex items-center gap-1"
                           >
                             {isProcessing ? <RefreshCw size={12} className="animate-spin" /> : <Users size={12} />}
-                            <span>{labels.analyze}</span>
+                            <span>{video.status === 'completed' ? labels.reanalyze : labels.analyze}</span>
                           </button>
                         )}
                         <button
@@ -737,7 +776,7 @@ function VideoCard({
           {labels.play}
         </button>
 
-        {(video.status === 'unprocessed' || video.status === 'failed') && (
+        {(video.status === 'unprocessed' || video.status === 'failed' || video.status === 'completed') && (
           <button
             onClick={onProcess}
             disabled={isProcessing}
@@ -748,7 +787,7 @@ function VideoCard({
             ) : (
               <Users size={14} />
             )}
-            {labels.analyze}
+            {video.status === 'completed' ? labels.reanalyze : labels.analyze}
           </button>
         )}
 
@@ -815,6 +854,8 @@ function VideoPlayerModal({
   const [suggestedName, setSuggestedName] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [manualRenameVal, setManualRenameVal] = useState(video.filename)
+  const [manualSceneUrl, setManualSceneUrl] = useState('')
+  const [isLinkingSceneUrl, setIsLinkingSceneUrl] = useState(false)
 
   const [stashdbCandidates, setStashdbCandidates] = useState<Array<{
     scene_id: string
@@ -839,6 +880,7 @@ function VideoPlayerModal({
     setStashdbMatchInfo(null)
     setStashdbError(null)
     setRenameError(null)
+    setManualSceneUrl('')
     setStashdbCandidates(null)
     setSearchInfo(null)
   }, [video.id, video.filename])
@@ -865,11 +907,22 @@ function VideoPlayerModal({
     }
   }
 
+  const applySuggestedName = (title: string | null, studio: string | null) => {
+    if (!title) return
+    const cleanTitle = title.replace(/[\\/:*?"<>|]/g, '')
+    const cleanStudio = studio?.replace(/[\\/:*?"<>|]/g, '')
+    const nextSuggestedName = cleanStudio ? `[${cleanStudio}] ${cleanTitle}` : cleanTitle
+    setSuggestedName(nextSuggestedName)
+    setManualRenameVal(nextSuggestedName)
+    setIsEditingName(true)
+  }
+
   const handleLinkCandidate = async (candidate: {
     scene_id: string
     title: string
     studio: string | null
     cover_url: string | null
+    performers?: string[]
   }) => {
     setIsMatchingStashdb(true)
     setStashdbError(null)
@@ -878,29 +931,48 @@ function VideoPlayerModal({
         scene_id: candidate.scene_id,
         title: candidate.title,
         studio: candidate.studio,
-        cover_url: candidate.cover_url
+        cover_url: candidate.cover_url,
+        performers: candidate.performers ?? [],
       })
-      if (candidate.studio && candidate.title) {
-        const cleanStudio = candidate.studio.replace(/[\\/:*?"<>|]/g, '')
-        const cleanTitle = candidate.title.replace(/[\\/:*?"<>|]/g, '')
-        setSuggestedName(`[${cleanStudio}] ${cleanTitle}`)
-      } else if (candidate.title) {
-        const cleanTitle = candidate.title.replace(/[\\/:*?"<>|]/g, '')
-        setSuggestedName(cleanTitle)
-      }
+      applySuggestedName(candidate.title, candidate.studio)
       setStashdbCandidates(null)
       setStashdbMatchInfo({
         scene_id: candidate.scene_id,
         title: candidate.title,
         studio: candidate.studio,
         cover_downloaded: true,
-        performers: []
+        performers: candidate.performers ?? []
       })
       onRefreshVideo()
     } catch (err) {
       setStashdbError(err instanceof Error ? err.message : 'Failed to link scene')
     } finally {
       setIsMatchingStashdb(false)
+    }
+  }
+
+  const handleLinkSceneUrl = async () => {
+    if (!manualSceneUrl.trim()) return
+    setIsLinkingSceneUrl(true)
+    setStashdbError(null)
+    try {
+      const scene = await linkStashdbByUrl(video.id, manualSceneUrl.trim())
+      applySuggestedName(scene.title, scene.studio)
+      setStashdbCandidates(null)
+      setSearchInfo(null)
+      setStashdbMatchInfo({
+        scene_id: scene.scene_id,
+        title: scene.title,
+        studio: scene.studio,
+        cover_downloaded: scene.cover_downloaded,
+        performers: scene.performers,
+      })
+      setManualSceneUrl('')
+      onRefreshVideo()
+    } catch (err) {
+      setStashdbError(err instanceof Error ? err.message : 'Failed to link scene URL')
+    } finally {
+      setIsLinkingSceneUrl(false)
     }
   }
 
@@ -952,6 +1024,10 @@ function VideoPlayerModal({
     })
     return groups
   }, [video.detections])
+
+  const confirmedPerformers = useMemo(() => {
+    return new Set((video.stashdb_performers ?? []).map(normalizePersonName))
+  }, [video.stashdb_performers])
 
   const seekTo = (seconds: number) => {
     if (videoRef.current) {
@@ -1063,13 +1139,13 @@ function VideoPlayerModal({
               </div>
 
               <div className="flex gap-2">
-                {(video.status === 'unprocessed' || video.status === 'failed') && (
+                {(video.status === 'unprocessed' || video.status === 'failed' || video.status === 'completed') && (
                   <button
                     onClick={onProcess}
                     className="md-state-layer md-filled-button px-4 py-2 font-semibold flex items-center gap-1 text-xs"
                   >
                     <RefreshCw size={14} />
-                    {labels.analyze}
+                    {video.status === 'completed' ? labels.reanalyze : labels.analyze}
                   </button>
                 )}
                 <button
@@ -1136,6 +1212,28 @@ function VideoPlayerModal({
                 >
                   <span>{language === 'ru' ? 'Переименовать' : 'Rename'}</span>
                 </button>
+              </div>
+
+              <div className="space-y-1.5 rounded-xl border border-outline-variant/50 bg-surface/70 p-2.5">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                  {language === 'ru' ? 'Ссылка на сцену StashDB' : 'Manual StashDB scene link'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={manualSceneUrl}
+                    onChange={(event) => setManualSceneUrl(event.target.value)}
+                    className="md-text-field min-w-0 flex-1 px-2.5 py-1.5 text-xs font-semibold"
+                    placeholder="https://stashdb.org/scenes/..."
+                  />
+                  <button
+                    onClick={handleLinkSceneUrl}
+                    disabled={isLinkingSceneUrl || !manualSceneUrl.trim()}
+                    className="md-state-layer rounded-chip border border-primary-500/60 bg-primary-600 px-3 py-1.5 text-[10px] font-extrabold text-white shadow-md shadow-primary-900/25 transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:border-outline-variant disabled:bg-surface-container-highest disabled:text-on-surface-variant disabled:shadow-none"
+                  >
+                    {isLinkingSceneUrl ? (language === 'ru' ? 'Связь...' : 'Linking...') : (language === 'ru' ? 'Связать' : 'Link')}
+                  </button>
+                </div>
               </div>
 
               {/* Search info + Candidates list */}
@@ -1205,7 +1303,7 @@ function VideoPlayerModal({
                       </div>
                       <button
                         onClick={() => handleLinkCandidate(cand)}
-                        className="md-state-layer bg-primary text-on-primary text-[10px] font-extrabold px-2.5 py-1.5 rounded-chip hover:bg-primary/95 shadow-sm whitespace-nowrap self-center"
+                        className="md-state-layer self-center whitespace-nowrap rounded-chip border border-primary-500/60 bg-primary-600 px-3 py-1.5 text-[10px] font-extrabold text-white shadow-md shadow-primary-900/25 transition-colors hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300"
                       >
                         {language === 'ru' ? 'Связать' : 'Link'}
                       </button>
@@ -1250,7 +1348,7 @@ function VideoPlayerModal({
                         </span>
                         <button
                           onClick={() => setManualRenameVal(suggestedName)}
-                          className="md-state-layer bg-primary-container text-primary-700 text-[10px] font-bold px-2 py-1 rounded hover:bg-primary-container-high"
+                          className="md-state-layer rounded-chip border border-primary-500/60 bg-primary-600 px-3 py-1.5 text-[10px] font-extrabold text-white shadow-md shadow-primary-900/25 transition-colors hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300"
                         >
                           {language === 'ru' ? 'Вставить' : 'Use'}
                         </button>
@@ -1281,7 +1379,7 @@ function VideoPlayerModal({
                     <button
                       onClick={handleRename}
                       disabled={isRenaming || !manualRenameVal || manualRenameVal === video.filename}
-                      className="bg-primary text-on-primary hover:bg-primary/95 text-[11px] font-bold px-3 py-1.5 rounded-chip transition-colors disabled:opacity-50"
+                      className="md-state-layer rounded-chip border border-primary-500/60 bg-primary-600 px-3 py-1.5 text-[11px] font-extrabold text-white shadow-md shadow-primary-900/25 transition-colors hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300 disabled:cursor-not-allowed disabled:border-outline-variant disabled:bg-surface-container-highest disabled:text-on-surface-variant disabled:shadow-none"
                     >
                       {isRenaming ? (language === 'ru' ? 'Сохранение...' : 'Renaming...') : (language === 'ru' ? 'Применить' : 'Apply')}
                     </button>
@@ -1369,6 +1467,7 @@ function VideoPlayerModal({
                   ) : (
                     (Object.entries(actorDetections) as [string, { name: string; timestamps: number[] }][]).map(([actorId, data]) => {
                       const isExpanded = expandedActorId === Number(actorId)
+                      const isConfirmedByStashdb = confirmedPerformers.has(normalizePersonName(data.name))
                       
                       return (
                         <div key={actorId} className="flex flex-col animate-fade-in">
@@ -1377,8 +1476,17 @@ function VideoPlayerModal({
                               onClick={() => setExpandedActorId(isExpanded ? null : Number(actorId))}
                               className="flex-1 flex items-center justify-between p-3.5 text-left"
                             >
-                              <span className="font-extrabold text-sm text-on-surface truncate pr-4">
-                                {data.name}
+                              <span className="flex min-w-0 items-center gap-1.5 pr-4">
+                                <span className="truncate text-sm font-extrabold text-on-surface">
+                                  {data.name}
+                                </span>
+                                {isConfirmedByStashdb && (
+                                  <CheckCircle2
+                                    size={15}
+                                    className="flex-shrink-0 text-success"
+                                    aria-label={language === 'ru' ? 'Подтверждено StashDB' : 'Confirmed by StashDB'}
+                                  />
+                                )}
                               </span>
                               <div className="flex items-center gap-1.5 flex-shrink-0">
                                 <span className="rounded-chip bg-primary-container px-2 py-0.5 text-[10px] font-bold text-primary-700">
@@ -1625,6 +1733,10 @@ function formatSize(bytes: number | null): string {
   return `${(mb / 1024).toFixed(1)} GB`
 }
 
+function normalizePersonName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]/g, '')
+}
+
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A'
   const h = Math.floor(seconds / 3600)
@@ -1651,6 +1763,7 @@ function videosLabels(language: 'en' | 'ru') {
       completed: 'Завершено',
       failed: 'Ошибка',
       analyze: 'Анализировать',
+      reanalyze: 'Переанализировать',
       delete: 'Удалить',
       confirmDelete: 'Вы действительно хотите удалить запись этого видео?',
       noVideos: 'Видео не найдены. Нажмите «Сканировать папку» для поиска в D:\\Videos.',
@@ -1678,6 +1791,7 @@ function videosLabels(language: 'en' | 'ru') {
     completed: 'Completed',
     failed: 'Failed',
     analyze: 'Analyze',
+    reanalyze: 'Reanalyze',
     delete: 'Delete',
     confirmDelete: 'Are you sure you want to delete this video record?',
     noVideos: 'No videos found. Click "Scan folder" to search in D:\\Videos.',
