@@ -320,6 +320,7 @@ textarea::placeholder {
   border: 1px solid var(--md-sys-glass-border);
   box-shadow: var(--md-sys-elevation-2);
   backdrop-filter: blur(22px) saturate(1.28);
+  -webkit-backdrop-filter: blur(22px) saturate(1.28);
 }
 
 .md-card {
@@ -364,6 +365,7 @@ textarea::placeholder {
   background: color-mix(in srgb, var(--md-sys-color-surface) 82%, transparent);
   color: var(--md-sys-color-on-surface-variant);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .md-filter-chip[data-active="true"] {
@@ -378,6 +380,25 @@ textarea::placeholder {
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--md-sys-color-surface-container-lowest);
   color: var(--md-sys-color-on-surface);
+  transition:
+    border-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard),
+    background-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard),
+    box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard);
+}
+
+.md-text-field:hover {
+  border-color: color-mix(in srgb, var(--md-sys-color-primary) 34%, var(--md-sys-color-outline-variant));
+}
+
+.md-results-transition {
+  animation: mdResultsIn var(--md-sys-motion-duration-long) var(--md-sys-motion-easing-emphasized);
+  transform-origin: top center;
+}
+
+.md-card-enter,
+.md-list-row-enter {
+  animation:
+    mdItemIn var(--md-sys-motion-duration-long) var(--md-sys-motion-easing-emphasized) both;
 }
 
 .md-elevation-1 {
@@ -458,6 +479,30 @@ textarea::placeholder {
 
 .fade-in {
   animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes mdResultsIn {
+  from {
+    opacity: 0.72;
+    transform: translateY(8px) scale(0.996);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes mdItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

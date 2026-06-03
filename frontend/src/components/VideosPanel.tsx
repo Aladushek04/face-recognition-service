@@ -120,6 +120,21 @@ export function VideosPanel() {
     return result
   }, [videos, durationFilter, sortBy, sortOrder])
 
+  const resultsTransitionKey = useMemo(
+    () => [
+      viewMode,
+      searchQuery,
+      statusFilter,
+      actorFilter,
+      durationFilter,
+      sortBy,
+      sortOrder,
+      processedVideos.length,
+      isLoading ? 'loading' : 'ready',
+    ].join(':'),
+    [viewMode, searchQuery, statusFilter, actorFilter, durationFilter, sortBy, sortOrder, processedVideos.length, isLoading]
+  )
+
   useEffect(() => {
     loadVideos(true)
   }, [loadVideos])
@@ -480,6 +495,7 @@ export function VideosPanel() {
       </div>
 
       {/* Loading state */}
+      <div key={resultsTransitionKey} className="md-results-transition">
       {isLoading ? (
         <div className="py-20 flex justify-center items-center">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
@@ -508,7 +524,7 @@ export function VideosPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30 text-on-surface font-medium">
-              {processedVideos.map((video) => {
+              {processedVideos.map((video, index) => {
                 const isProcessing = video.status === 'processing' || processingIds.has(video.id)
                 let statusBadge = ''
                 let statusText = ''
@@ -526,7 +542,11 @@ export function VideosPanel() {
                   statusText = labels.unprocessed
                 }
                 return (
-                  <tr key={video.id} className="hover:bg-surface-container-low/50 transition-colors">
+                  <tr
+                    key={video.id}
+                    className="md-list-row-enter hover:bg-surface-container-low/50 transition-colors"
+                    style={{ animationDelay: `${Math.min(index, 14) * 18}ms` }}
+                  >
                     <td className="p-4">
                       <div className="w-16 h-10 rounded-lg bg-surface-container-high overflow-hidden border border-outline-variant flex items-center justify-center relative">
                         {video.status === 'processing' ? (
@@ -613,19 +633,25 @@ export function VideosPanel() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {processedVideos.map((video) => (
-            <VideoCard
+          {processedVideos.map((video, index) => (
+            <div
               key={video.id}
-              video={video}
-              onOpen={() => openVideoDetails(video)}
-              onProcess={() => handleProcess(video.id)}
-              onDelete={() => handleDelete(video.id)}
-              isStartingProcess={processingIds.has(video.id)}
-              labels={labels}
-            />
+              className="md-card-enter h-full"
+              style={{ animationDelay: `${Math.min(index, 14) * 24}ms` }}
+            >
+              <VideoCard
+                video={video}
+                onOpen={() => openVideoDetails(video)}
+                onProcess={() => handleProcess(video.id)}
+                onDelete={() => handleDelete(video.id)}
+                isStartingProcess={processingIds.has(video.id)}
+                labels={labels}
+              />
+            </div>
           ))}
         </div>
       )}
+      </div>
 
       {/* Detail Modal with Player */}
       {selectedVideo && (
@@ -682,8 +708,8 @@ function VideoCard({
   }
 
   return (
-    <div className="md-tonal-card flex flex-col justify-between p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-short ease-standard group">
-      <div>
+    <div className="md-tonal-card flex h-full min-h-[430px] flex-col p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-short ease-standard group">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Thumbnail Preview */}
         <div className="relative aspect-video rounded-xl bg-surface-container-lowest overflow-hidden border border-outline-variant mb-3 flex items-center justify-center group-hover:shadow-md transition-all">
           {video.status === 'processing' ? (
@@ -719,16 +745,16 @@ function VideoCard({
           )}
         </div>
 
-        <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
-          <h3 className="font-bold text-on-surface text-sm line-clamp-2 break-all flex-1" title={video.filename}>
+        <div className="mb-2 flex min-h-[44px] items-start justify-between gap-3">
+          <h3 className="line-clamp-2 flex-1 break-words text-sm font-bold leading-5 text-on-surface" title={video.filename}>
             {video.filename}
           </h3>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-chip uppercase tracking-wider ${statusBadge}`}>
+          <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-chip uppercase tracking-wider ${statusBadge}`}>
             {statusText}
           </span>
         </div>
 
-        <div className="mt-2 space-y-1.5 text-xs text-on-surface-variant font-medium">
+        <div className="mt-2 min-h-[48px] space-y-1.5 text-xs text-on-surface-variant font-medium">
           <p className="flex items-center gap-1.5 truncate text-[11px] font-semibold text-on-surface-variant/70">
             <HardDrive size={12} />
             {video.filepath}
@@ -744,9 +770,9 @@ function VideoCard({
           </div>
         </div>
 
-        {/* List of detected actors */}
-        {video.actors && video.actors.length > 0 && (
-          <div className="mt-3">
+        <div className="mt-3 min-h-[62px]">
+          {video.actors && video.actors.length > 0 ? (
+            <>
             <p className="text-[10px] font-bold text-on-surface-variant/80 uppercase tracking-wider mb-1.5">
               {labels.detectedActors} ({video.actors.length}):
             </p>
@@ -762,12 +788,15 @@ function VideoCard({
                 </span>
               )}
             </div>
-          </div>
-        )}
+            </>
+          ) : (
+            <div className="h-full" aria-hidden="true" />
+          )}
+        </div>
       </div>
 
       {/* Actions row */}
-      <div className="flex gap-2 mt-4 pt-3 border-t border-outline-variant/30">
+      <div className="mt-auto flex gap-2 border-t border-outline-variant/30 pt-3">
         <button
           onClick={onOpen}
           className="md-state-layer md-filled-button flex-1 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 h-9"
@@ -856,6 +885,10 @@ function VideoPlayerModal({
   const [manualRenameVal, setManualRenameVal] = useState(video.filename)
   const [manualSceneUrl, setManualSceneUrl] = useState('')
   const [isLinkingSceneUrl, setIsLinkingSceneUrl] = useState(false)
+  const [actorSearchQuery, setActorSearchQuery] = useState('')
+  const [actorSearchResults, setActorSearchResults] = useState<Actor[]>([])
+  const [isActorSearchLoading, setIsActorSearchLoading] = useState(false)
+  const [actorSearchError, setActorSearchError] = useState<string | null>(null)
 
   const [stashdbCandidates, setStashdbCandidates] = useState<Array<{
     scene_id: string
@@ -883,6 +916,9 @@ function VideoPlayerModal({
     setManualSceneUrl('')
     setStashdbCandidates(null)
     setSearchInfo(null)
+    setActorSearchQuery('')
+    setActorSearchResults([])
+    setActorSearchError(null)
   }, [video.id, video.filename])
 
   const handleSearchStashdb = async () => {
@@ -993,6 +1029,8 @@ function VideoPlayerModal({
   const handleAddActor = async (actorId: number) => {
     try {
       await addActorToVideo(video.id, actorId)
+      setActorSearchQuery('')
+      setActorSearchResults([])
       onRefreshVideo()
     } catch (err) {
       console.error('Failed to add actor', err)
@@ -1024,6 +1062,43 @@ function VideoPlayerModal({
     })
     return groups
   }, [video.detections])
+
+  useEffect(() => {
+    const query = actorSearchQuery.trim()
+    setActorSearchError(null)
+
+    if (query.length < 2) {
+      setActorSearchResults([])
+      setIsActorSearchLoading(false)
+      return
+    }
+
+    let isCancelled = false
+    setIsActorSearchLoading(true)
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await getActors(1, 12, query)
+        if (!isCancelled) {
+          setActorSearchResults(data.actors.filter((actor) => !actorDetections[actor.id]))
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setActorSearchResults([])
+          setActorSearchError(err instanceof Error ? err.message : 'Actor search failed')
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsActorSearchLoading(false)
+        }
+      }
+    }, 220)
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [actorSearchQuery, actorDetections])
 
   const confirmedPerformers = useMemo(() => {
     return new Set((video.stashdb_performers ?? []).map(normalizePersonName))
@@ -1428,8 +1503,57 @@ function VideoPlayerModal({
                       {Object.keys(actorDetections).length}
                     </span>
                   </div>
-                  {/* Manual add actor dropdown */}
-                  <div className="flex gap-1.5 items-center mt-1">
+                  {/* Manual actor search */}
+                  <div className="relative mt-1">
+                    <Search
+                      size={14}
+                      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="search"
+                      value={actorSearchQuery}
+                      onChange={(e) => setActorSearchQuery(e.target.value)}
+                      placeholder={language === 'ru' ? '+ Найти актера в базе...' : '+ Search actor database...'}
+                      className="md-text-field w-full py-1.5 pl-8 pr-8 text-xs font-semibold text-on-surface bg-surface"
+                    />
+                    {isActorSearchLoading && (
+                      <RefreshCw
+                        size={13}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-primary-700"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {actorSearchQuery.trim().length >= 2 && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-72 overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-1.5 shadow-xl animate-fade-in">
+                        {actorSearchError ? (
+                          <div className="px-3 py-2 text-xs font-semibold text-error">{actorSearchError}</div>
+                        ) : actorSearchResults.length > 0 ? (
+                          actorSearchResults.map((actor) => (
+                            <button
+                              key={actor.id}
+                              type="button"
+                              onClick={() => handleAddActor(actor.id)}
+                              className="md-state-layer flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-xs font-bold text-on-surface transition-colors hover:bg-primary-container hover:text-primary-700"
+                            >
+                              <span className="min-w-0 truncate">{actor.name}</span>
+                              <span className="flex-shrink-0 rounded-chip bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant">
+                                {actor.scene_count ?? 0}
+                              </span>
+                            </button>
+                          ))
+                        ) : isActorSearchLoading ? (
+                          <div className="px-3 py-2 text-xs font-semibold text-on-surface-variant">
+                            {language === 'ru' ? 'Поиск...' : 'Searching...'}
+                          </div>
+                        ) : (
+                          <div className="px-3 py-2 text-xs font-semibold text-on-surface-variant">
+                            {language === 'ru' ? 'Ничего не найдено' : 'No actors found'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {false && (
                     <select
                       onChange={(e) => {
                         const val = e.target.value;
@@ -1452,6 +1576,7 @@ function VideoPlayerModal({
                           </option>
                         ))}
                     </select>
+                    )}
                   </div>
                 </div>
                 
