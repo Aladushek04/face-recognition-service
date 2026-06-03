@@ -1,6 +1,6 @@
 # Face Recognition Service
 
-A local, self-hosted face recognition service for identifying actors/actresses from uploaded photos. All processing happens offline on your machine — no data leaves your computer.
+A local, self-hosted face recognition service for identifying actors/actresses from uploaded photos and videos. Face detection, embeddings, vector search, and database storage run locally; optional integrations such as StashDB use network APIs only when configured.
 
 ## Features
 
@@ -11,7 +11,7 @@ A local, self-hosted face recognition service for identifying actors/actresses f
 - **Material 3 Interface**: Modern design conforming to Material 3 specs (shapes, dark mode, spacious stacked comparison view)
 - **Bilingual Localization**: Full English and Russian language toggle support (EN/RU)
 - **REST API**: Full API for programmatic access (see API docs at `/docs`)
-- **100% Offline**: All ML models run locally, no external API calls
+- **Local ML Processing**: Face recognition runs on your machine; optional metadata imports can call external APIs
 - **Privacy-First**: All images and data stay on your machine
 
 ## Architecture
@@ -83,6 +83,15 @@ npm install
 cd ..
 cp .env.example .env
 # Edit .env as needed
+```
+
+Runtime data can be kept outside the repository, which is useful when actor images, FAISS indexes, model files, and videos live on a larger HDD:
+
+```env
+BASE_DIR=D:\FaceService
+ACTORS_DIR=D:\FaceService\actors
+FAISS_INDEX_DIR=D:\FaceService\data\faiss_index
+VIDEOS_DIR=D:\Videos
 ```
 
 ### 5. Seed Demo Actors
@@ -247,6 +256,11 @@ Full interactive API docs: `http://localhost:8000/docs`
 |----------|---------|-------------|
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8000` | Server port |
+| `CORS_ORIGINS` | `["http://localhost:3000","http://127.0.0.1:3000"]` | Browser origins allowed to call the API |
+| `BASE_DIR` | project root | Runtime data root for uploads, DB, embeddings, thumbnails, and models |
+| `ACTORS_DIR` | `<BASE_DIR>/data/actors` | Reference image directory |
+| `FAISS_INDEX_DIR` | `<BASE_DIR>/data/faiss_index` | FAISS index directory |
+| `VIDEOS_DIR` | `D:\Videos` | Directory scanned by the video media center |
 | `FACE_RECOGNITION_THRESHOLD` | `0.65` | Min confidence for matches |
 | `FAISS_INDEX_TYPE` | `HNSW32` | Index type (HNSW32, IVFFlat, Flat) |
 | `MAX_UPLOAD_SIZE_MB` | `50` | Max upload size |
@@ -284,9 +298,9 @@ Full interactive API docs: `http://localhost:8000/docs`
 
 ## Privacy
 
-- ✅ All processing is local
+- ✅ Face detection, embeddings, vector search, and video analysis are local
 - ✅ No images uploaded to any server
-- ✅ No external API calls
+- ✅ External API calls are optional and require configured integrations such as StashDB
 - ✅ Database stored locally (SQLite)
 - ✅ Models cached locally after first download
 

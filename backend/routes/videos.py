@@ -1,4 +1,3 @@
-import os
 import sqlite3
 import json
 import re
@@ -157,8 +156,8 @@ def generate_missing_thumbnails():
 @router.post("/scan")
 def scan_videos():
     """Scan the configured VIDEOS_DIR and add new videos as unprocessed."""
-    videos_dir_path = os.getenv("VIDEOS_DIR", "D:\\Videos")
-    videos_dir = Path(videos_dir_path)
+    videos_dir = settings.videos_dir
+    videos_dir_path = str(videos_dir)
     
     if not videos_dir.exists():
         raise HTTPException(
@@ -337,6 +336,12 @@ def process_unprocessed_videos(background_tasks: BackgroundTasks):
 @router.post("/{video_id}/rename")
 def rename_video(video_id: int, new_filename: str = Body(..., embed=True)):
     """Renames the video file on disk and updates the database record."""
+    requested_name = new_filename.strip()
+    if not requested_name:
+        raise HTTPException(status_code=400, detail="New filename cannot be empty")
+    if Path(requested_name).name != requested_name:
+        raise HTTPException(status_code=400, detail="New filename must not include a path")
+
     db_path = get_db_path()
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -349,9 +354,13 @@ def rename_video(video_id: int, new_filename: str = Body(..., embed=True)):
             raise HTTPException(status_code=404, detail="Original video file not found on disk")
             
         old_suffix = old_path.suffix
-        new_path = old_path.parent / new_filename
+        new_path = old_path.parent / requested_name
         if not new_path.suffix:
             new_path = new_path.with_suffix(old_suffix)
+        new_path = new_path.resolve()
+        parent_dir = old_path.parent.resolve()
+        if new_path.parent != parent_dir:
+            raise HTTPException(status_code=400, detail="New filename must stay in the original directory")
             
         if new_path.exists():
             raise HTTPException(status_code=400, detail="A file with that name already exists")

@@ -1,6 +1,7 @@
 """Application configuration."""
 
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from pathlib import Path
 
 
@@ -11,13 +12,33 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
+    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Paths
-    base_dir: Path = Path(__file__).parent.parent.parent
-    actors_dir: Path = base_dir / "data" / "actors"
-    faiss_index_dir: Path = base_dir / "data" / "faiss_index"
-    faiss_index_path: Path = faiss_index_dir / "face_index.faiss"
-    faiss_id_map_path: Path = faiss_index_dir / "face_index_ids.pkl"
+    base_dir: Path = Path(__file__).resolve().parent.parent
+    actors_dir: Path | None = None
+    faiss_index_dir: Path | None = None
+    videos_dir: Path = Path("D:/Videos")
+
+    @model_validator(mode="after")
+    def resolve_dependent_paths(self) -> "Settings":
+        if self.actors_dir is None:
+            self.actors_dir = self.base_dir / "data" / "actors"
+        if self.faiss_index_dir is None:
+            self.faiss_index_dir = self.base_dir / "data" / "faiss_index"
+        return self
+
+    @property
+    def faiss_index_path(self) -> Path:
+        if self.faiss_index_dir is None:
+            return self.base_dir / "data" / "faiss_index" / "face_index.faiss"
+        return self.faiss_index_dir / "face_index.faiss"
+
+    @property
+    def faiss_id_map_path(self) -> Path:
+        if self.faiss_index_dir is None:
+            return self.base_dir / "data" / "faiss_index" / "face_index_ids.pkl"
+        return self.faiss_index_dir / "face_index_ids.pkl"
 
     # Face recognition
     face_detection_threshold: float = 0.5
