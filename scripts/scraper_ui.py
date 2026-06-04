@@ -431,6 +431,9 @@ def cleanup_flow() -> None:
     command = [PYTHON, str(ROOT / "scripts" / "cleanup_actors.py")]
     filter_args, summary = common_filters(cleanup_mode=True)
     command += filter_args
+    country_args, country_summary = country_filters()
+    command += country_args
+    summary += country_summary
 
     section("5. Безопасность удаления")
     if ask_yes_no(
@@ -465,6 +468,12 @@ def build_index_flow() -> None:
     print(f"{COLORS['magenta']}> Сборка FAISS index{COLORS['reset']}\n")
     command = [PYTHON, str(ROOT / "scripts" / "build_index.py")]
     summary = ["Задача: пересобрать face-recognition index"]
+    min_images = ask_int(
+        "Минимум reference-фото у актера для попадания в index",
+        4,
+        hint="Актеры с меньшим числом фото будут пропущены. 1 = индексировать всех, у кого есть фото.",
+    )
+    add_arg(command, summary, "--min-images", min_images, f"Минимум фото на актера: {min_images}")
     if ask_yes_no(
         "Пересчитать все embeddings заново?",
         False,

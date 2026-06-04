@@ -162,6 +162,19 @@ FACE_EXECUTION_PROVIDERS=["CUDAExecutionProvider","CPUExecutionProvider"]
 python scripts\build_index.py
 ```
 
+По умолчанию индексатор пропускает актеров, у которых меньше 4 reference-фото. Это снижает шум от слабых профилей. Чтобы изменить порог:
+
+```powershell
+python scripts\build_index.py --min-images 4
+python scripts\build_index.py --min-images 1
+```
+
+Индексатор читает reference-фото пачками и по умолчанию не печатает каждого пропущенного актера. Для подробного списка пропусков:
+
+```powershell
+python scripts\build_index.py --verbose-skips
+```
+
 Полная пересборка embeddings:
 
 ```powershell
@@ -273,10 +286,22 @@ VIDEO_FALLBACK_MIN_ACTOR_HITS=3
 python scripts\cleanup_actors.py --gender female --breast-type augmented --min-scenes 10 --min-birth-year 1960 --require-image
 ```
 
+Проверить актеров вне выбранной карты стран:
+
+```powershell
+python scripts\cleanup_actors.py --country-region preferred-map
+```
+
+Комбинированный preview для удаления шлака по качеству профиля и стране:
+
+```powershell
+python scripts\cleanup_actors.py --country-region preferred-map --gender female --breast-type augmented --min-scenes 10 --min-birth-year 1960 --require-image
+```
+
 Удалить найденных кандидатов:
 
 ```powershell
-python scripts\cleanup_actors.py --gender female --breast-type augmented --min-scenes 10 --min-birth-year 1960 --require-image --apply
+python scripts\cleanup_actors.py --country-region preferred-map --gender female --breast-type augmented --min-scenes 10 --min-birth-year 1960 --require-image --apply
 ```
 
 Проверить reference-фото без пригодного лица:
