@@ -166,6 +166,11 @@ embedding:
 python scripts/build_index.py --refresh-cache
 ```
 
+Video analysis also has an optional fallback pass. If the first pass finds too
+few confirmed actors, the service scans the same video with a shorter frame step
+and a softer recognition threshold, then requires more repeated hits before
+saving detections. This does not require rebuilding the FAISS index.
+
 ### 9. Start the Services
 
 **Backend:**

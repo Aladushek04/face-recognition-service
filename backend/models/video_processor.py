@@ -44,60 +44,48 @@ class VideoProcessor:
         # Generate thumbnail
         self._generate_thumbnail(cap, video_id, total_frames, fps)
 
-        # Scan every N seconds of video based on settings
-        frame_step = max(int(fps * settings.video_frame_step), 1)
-        
         candidate_detections = []
-        frame_idx = 0
-        last_progress_update = 0
         
         try:
-            while True:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                if not ret:
-                    break
+            candidate_detections.extend(
+                self._scan_video_faces(
+                    cap=cap,
+                    video_id=video_id,
+                    db_path=db_path,
+                    fps=fps,
+                    total_frames=total_frames,
+                    frame_step_seconds=settings.video_frame_step,
+                    threshold=settings.video_face_recognition_threshold,
+                    progress_start=0,
+                    progress_end=85,
+                )
+            )
 
-                timestamp = frame_idx / fps
-                
-                # Update progress in DB every 5%
-                progress = min(int((frame_idx / total_frames) * 100), 99)
-                if progress >= last_progress_update + 5:
-                    self._update_progress(db_path, video_id, progress)
-                    last_progress_update = progress
-                
-                # Protect FaceDetector and VectorStore with lock to avoid concurrent model access
-                with self._lock:
-                    faces = self.detector.detect_faces(frame)
-                    
-                    for face in faces:
-                        embedding = face["embedding"].astype(np.float32)
-                        # Search several actor candidates. Video frames are often
-                        # blurrier/profile-heavy, so top-1 alone can miss a real
-                        # actor when a similar reference vector ranks first.
-                        results = self.vector_store.search(
-                            embedding,
-                            k=max(settings.video_face_search_k, 1),
-                            threshold=settings.video_face_recognition_threshold
-                        )
+            detections = self._confirm_video_detections(
+                candidate_detections,
+                min_actor_hits=settings.video_min_actor_hits,
+            )
 
-                        for actor_id, confidence in results:
-                            bbox = face["bbox"] # [x1, y1, x2, y2]
-                            candidate_detections.append({
-                                "video_id": video_id,
-                                "actor_id": actor_id,
-                                "timestamp": round(timestamp, 2),
-                                "bbox": json.dumps([int(b) for b in bbox]),
-                                "confidence": float(confidence)
-                            })
-
-                frame_idx += frame_step
-                if frame_idx >= total_frames:
-                    break
+            if self._should_run_fallback(detections):
+                print(f"[VideoProcessor] Running fallback pass for video {video_id}")
+                fallback_candidates = self._scan_video_faces(
+                    cap=cap,
+                    video_id=video_id,
+                    db_path=db_path,
+                    fps=fps,
+                    total_frames=total_frames,
+                    frame_step_seconds=settings.video_fallback_frame_step,
+                    threshold=settings.video_fallback_face_recognition_threshold,
+                    progress_start=85,
+                    progress_end=99,
+                )
+                candidate_detections.extend(fallback_candidates)
+                detections = self._confirm_video_detections(
+                    candidate_detections,
+                    min_actor_hits=settings.video_fallback_min_actor_hits,
+                )
 
             cap.release()
-
-            detections = self._confirm_video_detections(candidate_detections)
 
             # Save detections to database
             self._save_detections(db_path, detections)
@@ -106,6 +94,74 @@ class VideoProcessor:
         except Exception as e:
             cap.release()
             self._update_status(db_path, video_id, "failed", str(e))
+
+    def _scan_video_faces(
+        self,
+        *,
+        cap,
+        video_id: int,
+        db_path: str,
+        fps: float,
+        total_frames: int,
+        frame_step_seconds: float,
+        threshold: float,
+        progress_start: int,
+        progress_end: int,
+    ) -> list[dict]:
+        frame_step = max(int(fps * max(frame_step_seconds, 0.1)), 1)
+        frame_idx = 0
+        last_progress_update = progress_start - 5
+        candidate_detections: list[dict] = []
+
+        while True:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            timestamp = frame_idx / fps
+            ratio = min(max(frame_idx / total_frames, 0.0), 1.0)
+            progress = min(int(progress_start + ratio * (progress_end - progress_start)), progress_end)
+            if progress >= last_progress_update + 5:
+                self._update_progress(db_path, video_id, progress)
+                last_progress_update = progress
+
+            # Protect FaceDetector and VectorStore with lock to avoid concurrent model access.
+            with self._lock:
+                faces = self.detector.detect_faces(frame)
+
+                for face in faces:
+                    embedding = face["embedding"].astype(np.float32)
+                    # Search several actor candidates. Video frames are often
+                    # blurrier/profile-heavy, so top-1 alone can miss a real
+                    # actor when a similar reference vector ranks first.
+                    results = self.vector_store.search(
+                        embedding,
+                        k=max(settings.video_face_search_k, 1),
+                        threshold=threshold,
+                    )
+
+                    for actor_id, confidence in results:
+                        bbox = face["bbox"]  # [x1, y1, x2, y2]
+                        candidate_detections.append({
+                            "video_id": video_id,
+                            "actor_id": actor_id,
+                            "timestamp": round(timestamp, 2),
+                            "bbox": json.dumps([int(b) for b in bbox]),
+                            "confidence": float(confidence),
+                        })
+
+            frame_idx += frame_step
+            if frame_idx >= total_frames:
+                break
+
+        return candidate_detections
+
+    def _should_run_fallback(self, detections: list[dict]) -> bool:
+        if not settings.video_fallback_enabled:
+            return False
+        actor_ids = {int(item["actor_id"]) for item in detections}
+        return len(actor_ids) < max(settings.video_fallback_trigger_min_actors, 0)
 
     def _generate_thumbnail(self, cap, video_id: int, total_frames: int, fps: float):
         try:
@@ -173,7 +229,7 @@ class VideoProcessor:
             )
             conn.commit()
 
-    def _confirm_video_detections(self, candidates: list[dict]) -> list[dict]:
+    def _confirm_video_detections(self, candidates: list[dict], min_actor_hits: int) -> list[dict]:
         """Keep actor hits that are repeated or individually strong.
 
         Photo matching can safely use a stricter single-frame threshold. Video
@@ -192,7 +248,7 @@ class VideoProcessor:
         for hits in grouped.values():
             max_confidence = max(float(hit["confidence"]) for hit in hits)
             if (
-                len(hits) >= settings.video_min_actor_hits
+                len(hits) >= max(min_actor_hits, 1)
                 or max_confidence >= settings.video_face_strong_match_threshold
             ):
                 confirmed.extend(hits)

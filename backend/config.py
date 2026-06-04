@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     video_face_strong_match_threshold: float = 0.68
     video_face_search_k: int = 5
     video_min_actor_hits: int = 2
+    video_fallback_enabled: bool = True
+    video_fallback_frame_step: float = 0.5
+    video_fallback_face_recognition_threshold: float = 0.48
+    video_fallback_min_actor_hits: int = 3
+    video_fallback_trigger_min_actors: int = 1
     concurrent_video_limit: int = 1
 
     # FAISS
