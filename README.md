@@ -124,7 +124,13 @@ Useful options:
 python scripts/scrape_stashdb.py --query "Jane" --limit 20
 python scripts/scrape_stashdb.py --limit 200 --page-size 50 --no-images
 python scripts/scrape_stashdb.py --limit 10 --dry-run
+python scripts/scrape_stashdb.py --country-region preferred-map --limit 200
 ```
+
+The `preferred-map` country region keeps the preferred green countries from the
+user map and skips the red Asia/Africa/Middle East countries. Empty country
+values are skipped by default; add `--allow-unknown-country` if you want to keep
+them.
 
 After importing images, rebuild the FAISS index with `python scripts/build_index.py`.
 

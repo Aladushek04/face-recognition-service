@@ -172,6 +172,48 @@ def add_arg(args: list[str], summary: list[str], flag: str, value: str | int | f
     summary.append(text)
 
 
+def country_filters() -> tuple[list[str], list[str]]:
+    args: list[str] = []
+    summary: list[str] = []
+
+    section("Country filter")
+    if ask_yes_no(
+        "Use preferred country map?",
+        True,
+        yes="keep green countries from the map; skip red Asia/Africa/Middle East countries and empty country profiles",
+        no="do not filter by country",
+    ):
+        args += ["--country-region", "preferred-map"]
+        summary.append("Countries: preferred green map")
+        if ask_yes_no(
+            "Keep profiles with empty country?",
+            False,
+            yes="unknown country will pass the country filter",
+            no="unknown country will be skipped",
+        ):
+            args.append("--allow-unknown-country")
+            summary.append("Countries: empty/unknown allowed")
+        else:
+            summary.append("Countries: empty/unknown skipped")
+
+        extra_include = ask_text(
+            "Extra countries to include, comma-separated",
+            None,
+            hint="Optional. Example: Australia,New Zealand",
+        )
+        add_arg(args, summary, "--include-countries", extra_include, f"Extra include countries: {extra_include}")
+        extra_exclude = ask_text(
+            "Extra countries to exclude, comma-separated",
+            None,
+            hint="Optional. Example: Turkey,Georgia",
+        )
+        add_arg(args, summary, "--exclude-countries", extra_exclude, f"Extra exclude countries: {extra_exclude}")
+    else:
+        summary.append("Countries: no country filter")
+
+    return args, summary
+
+
 def common_filters(*, cleanup_mode: bool = False) -> tuple[list[str], list[str]]:
     args: list[str] = []
     summary: list[str] = []
@@ -283,6 +325,9 @@ def scrape_flow(*, backfill: bool = False) -> None:
     command = [PYTHON, str(ROOT / "scripts" / "scrape_stashdb.py")]
     filter_args, summary = common_filters()
     command += filter_args
+    country_args, country_summary = country_filters()
+    command += country_args
+    summary += country_summary
 
     section("5. Режим запуска")
     if backfill:
