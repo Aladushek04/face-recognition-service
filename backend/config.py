@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     embedding_dim: int = 512
     face_execution_providers: list[str] = ["CPUExecutionProvider"]
     video_frame_step: float = 1.0
+    video_face_recognition_threshold: float = 0.55
+    video_face_strong_match_threshold: float = 0.68
+    video_face_search_k: int = 5
+    video_min_actor_hits: int = 2
     concurrent_video_limit: int = 1
 
     # FAISS
