@@ -4,7 +4,7 @@ import { Activity, Camera, Database, Eye, EyeOff, Moon, Sun } from 'lucide-react
 import { useUiPreferences } from '../lib/uiPreferences'
 import type { HealthStatus } from '../types'
 
-export type AppView = 'upload' | 'actors' | 'stashdb' | 'videos'
+export type AppView = 'upload' | 'actors' | 'videos'
 
 export interface AppNavItem {
   id: AppView

@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Upload, Users, Camera, Download, Film } from 'lucide-react'
+import { Upload, Users, Camera, Film } from 'lucide-react'
 import { AppShell } from './components/AppShell'
 import { UploadZone } from './components/UploadZone'
 import { ResultsPanel } from './components/ResultsPanel'
 import { ActorsPanel } from './components/ActorsPanel'
-import { StashImportPanel } from './components/StashImportPanel'
 import { VideosPanel } from './components/VideosPanel'
 import { useAppStore } from './hooks/useStore'
 import { getHealth } from './lib/api'
@@ -42,7 +41,6 @@ function App() {
   const navItems = [
     { id: 'upload' as const, label: language === 'ru' ? 'Поиск' : 'Upload', icon: Upload },
     { id: 'actors' as const, label: language === 'ru' ? 'База' : 'Actors', icon: Users },
-    { id: 'stashdb' as const, label: t('stashdbTabLabel'), icon: Download },
     { id: 'videos' as const, label: language === 'ru' ? 'Видео' : 'Videos', icon: Film },
   ]
 
@@ -83,12 +81,6 @@ function App() {
       {activeView === 'actors' && (
         <section className="md-card p-5 lg:p-6">
           <ActorsPanel onAddActor={() => {}} />
-        </section>
-      )}
-
-      {activeView === 'stashdb' && (
-        <section className="md-card p-5 lg:p-6">
-          <StashImportPanel />
         </section>
       )}
 
