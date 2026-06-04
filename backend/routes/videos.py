@@ -4,6 +4,7 @@ import re
 import requests
 import cv2
 import threading
+import filetype
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Body
@@ -13,6 +14,7 @@ from models.video_processor import VideoProcessor
 from config import settings
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
+VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v", ".wmv", ".ts"}
 
 
 def _decode_json_list(value: object) -> list[str]:
@@ -35,6 +37,46 @@ def _video_thumbnail_url(video_id: int) -> str | None:
     if not thumb_path.exists():
         return None
     return f"/api/thumbnails/{video_id}.jpg"
+
+
+def _infer_video_suffix(path: Path) -> str:
+    """Infer a video suffix for files that were previously renamed without one."""
+    suffix = path.suffix.lower()
+    if suffix in VIDEO_EXTENSIONS:
+        return suffix
+
+    try:
+        kind = filetype.guess(str(path))
+    except Exception:
+        kind = None
+
+    if kind and kind.extension:
+        inferred = f".{kind.extension.lower()}"
+        if inferred in VIDEO_EXTENSIONS:
+            return inferred
+
+    return ""
+
+
+def _resolve_rename_target(old_path: Path, requested_name: str) -> Path:
+    old_suffix = _infer_video_suffix(old_path)
+    requested_path = Path(requested_name)
+    requested_suffix = requested_path.suffix.lower()
+
+    if requested_suffix in VIDEO_EXTENSIONS:
+        if old_suffix and requested_suffix != old_suffix:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Changing video extension is not supported. Keep {old_suffix}.",
+            )
+        return old_path.parent / requested_name
+
+    # Scene titles often contain dots, e.g. "Anal. Deep balls". Treat unknown
+    # suffixes as title punctuation and append the real container extension.
+    if old_suffix:
+        return old_path.parent / f"{requested_name}{old_suffix}"
+
+    return old_path.parent / requested_name
 
 
 @router.get("")
@@ -192,7 +234,6 @@ def scan_videos():
             detail=f"Videos directory {videos_dir_path} does not exist. Please create it or configure VIDEOS_DIR in .env."
         )
         
-    video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v"}
     db_path = get_db_path()
     
     scanned_count = 0
@@ -200,7 +241,7 @@ def scan_videos():
     
     with sqlite3.connect(db_path) as conn:
         for file in videos_dir.rglob("*"):
-            if file.is_file() and file.suffix.lower() in video_extensions:
+            if file.is_file() and file.suffix.lower() in VIDEO_EXTENSIONS:
                 scanned_count += 1
                 filepath = str(file.resolve())
                 filename = file.name
@@ -419,10 +460,7 @@ def rename_video(video_id: int, new_filename: str = Body(..., embed=True)):
         if not old_path.exists():
             raise HTTPException(status_code=404, detail="Original video file not found on disk")
             
-        old_suffix = old_path.suffix
-        new_path = old_path.parent / requested_name
-        if not new_path.suffix:
-            new_path = new_path.with_suffix(old_suffix)
+        new_path = _resolve_rename_target(old_path, requested_name)
         new_path = new_path.resolve()
         parent_dir = old_path.parent.resolve()
         if new_path.parent != parent_dir:
