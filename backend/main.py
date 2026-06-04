@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from routes import upload, actors, stashdb, videos
+from routes import upload, actors, stashdb, videos, tools
 from database.schema import init_db
 
 _index_rebuild_state = {
@@ -49,6 +49,7 @@ app.include_router(upload.router)
 app.include_router(actors.router)
 app.include_router(stashdb.router)
 app.include_router(videos.router)
+app.include_router(tools.router)
 
 # Mount static files for icons
 icons_dir = Path(__file__).parent.parent / "data" / "icons"
