@@ -164,11 +164,12 @@ class VectorStore:
 
         # Search more vectors than the final actor count because one actor can
         # have multiple reference photos and occupy several nearest slots.
-        candidate_k = min(max(k * 5, k), self.index_size)
+        multiplier = max(settings.faiss_candidate_multiplier, 1)
+        candidate_k = min(max(k * multiplier, k), self.index_size)
         distances, indices = self._index.search(query, candidate_k)
 
         metric_type = getattr(self._index, "metric_type", faiss.METRIC_INNER_PRODUCT)
-        best_by_actor: dict[int, float] = {}
+        similarities_by_actor: dict[int, list[float]] = {}
         for dist, idx in zip(distances[0], indices[0]):
             if idx == -1:  # No result
                 continue
@@ -179,13 +180,45 @@ class VectorStore:
             else:
                 # Inner product over normalized embeddings is cosine similarity.
                 similarity = float(dist)
-            if threshold > 0 and similarity < threshold:
-                continue
             actor_id = self._id_map.get(idx, -1)
             if actor_id != -1:
-                best_by_actor[actor_id] = max(best_by_actor.get(actor_id, similarity), similarity)
+                similarities_by_actor.setdefault(actor_id, []).append(similarity)
 
-        return sorted(best_by_actor.items(), key=lambda item: item[1], reverse=True)[:k]
+        actor_scores = self._aggregate_actor_scores(similarities_by_actor)
+        if threshold > 0:
+            actor_scores = {
+                actor_id: score
+                for actor_id, score in actor_scores.items()
+                if score >= threshold
+            }
+
+        return sorted(actor_scores.items(), key=lambda item: item[1], reverse=True)[:k]
+
+    def _aggregate_actor_scores(self, similarities_by_actor: dict[int, list[float]]) -> dict[int, float]:
+        """Score actors by their best match plus support from nearby references.
+
+        Several good reference photos for the same actor should be stronger than
+        one isolated nearest vector. This keeps the old best-vector behavior as
+        the dominant signal and adds a small vote from the next closest vectors.
+        """
+        top_n = max(settings.face_reference_vote_top_n, 1)
+        vote_weight = min(max(settings.face_reference_vote_weight, 0.0), 1.0)
+        vote_bonus = max(settings.face_reference_vote_bonus, 0.0)
+
+        scores: dict[int, float] = {}
+        for actor_id, similarities in similarities_by_actor.items():
+            if not similarities:
+                continue
+            top = sorted(similarities, reverse=True)[:top_n]
+            best = top[0]
+            mean_top = float(np.mean(top))
+            support_bonus = min(max(len(top) - 1, 0) * vote_bonus, 0.03)
+            scores[actor_id] = min(
+                (best * (1.0 - vote_weight)) + (mean_top * vote_weight) + support_bonus,
+                1.0,
+            )
+
+        return scores
 
     def remove_actor(self, actor_id: int) -> bool:
         """Remove all vectors for an actor from the index."""

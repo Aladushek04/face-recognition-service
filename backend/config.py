@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Face recognition
     face_detection_threshold: float = 0.5
     face_recognition_threshold: float = 0.65
+    face_reference_vote_top_n: int = 3
+    face_reference_vote_weight: float = 0.2
+    face_reference_vote_bonus: float = 0.01
+    faiss_candidate_multiplier: int = 20
     max_faces_per_image: int = 10
     embedding_dim: int = 512
     face_execution_providers: list[str] = ["CPUExecutionProvider"]

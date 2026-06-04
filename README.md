@@ -157,6 +157,15 @@ python scripts/build_index.py
 
 This scans all actor images, extracts face embeddings, and builds the FAISS index.
 
+The matcher can use several reference embeddings for the same actor. Add
+multiple visually different photos per actor, then re-run the index build after
+adding or replacing photos. Use `--refresh-cache` to regenerate every cached
+embedding:
+
+```bash
+python scripts/build_index.py --refresh-cache
+```
+
 ### 9. Start the Services
 
 **Backend:**

@@ -653,8 +653,9 @@ def _parse_filename(filename: str) -> dict:
         date_hint = date_match.group(0)
         stem = stem[:date_match.start()] + stem[date_match.end():]
 
-    # Replace separators with spaces
+    # Replace separators with spaces and normalize punctuation before tokenizing.
     cleaned = re.sub(r'[_.\-\[\](){}]', ' ', stem)
+    cleaned = _normalize(cleaned)
 
     # Remove part/scene numbering: pt1, part2, s01e02, ep3, scene4, etc.
     cleaned = re.sub(r'\b(?:pt|part|ep|episode|s\d+e)\s*\d+\b', '', cleaned, flags=re.IGNORECASE)
@@ -713,6 +714,25 @@ def _find_actor_tokens(tokens: list[str], known_actor_names: list[str]) -> tuple
     remaining = [tokens[i] for i in range(len(tokens)) if i not in matched_indices]
 
     return actor_parts, remaining
+
+
+def _filename_exact_queries(filename: str) -> list[str]:
+    """Build exact StashDB text-search phrases before actor/studio token stripping."""
+    stem = Path(filename).stem
+    stem = re.sub(r'[_]+', ' ', stem)
+    stem = ' '.join(stem.split())
+
+    queries: list[str] = []
+    _add_unique_query(queries, stem)
+
+    # Also try the title without a leading "[Studio]" prefix while preserving
+    # performer names. StashDB exact search often likes "Actor - Title" style
+    # strings, but bracketed site tags can be inconsistent.
+    without_bracket_prefix = re.sub(r'^\s*\[[^\]]+\]\s*', '', stem).strip()
+    if without_bracket_prefix != stem:
+        _add_unique_query(queries, without_bracket_prefix)
+
+    return queries
 
 
 def calculate_match_score(
@@ -935,6 +955,9 @@ def _build_search_queries(filename: str, detected_actors: list[str], all_db_acto
     tokens = parsed["tokens"]
     queries: list[str] = []
     known_actor_names = detected_actors + all_db_actors
+
+    for query in _filename_exact_queries(filename):
+        _add_unique_query(queries, query)
 
     _, title_tokens = _find_actor_tokens(tokens, known_actor_names)
     title_tokens_no_stop = [token for token in title_tokens if token not in _STOPWORDS]
