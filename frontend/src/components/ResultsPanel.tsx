@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import type { FaceMatch, UploadResponse, Actor } from '../types'
 import { X, Clock, User, AlertCircle, ImageOff, Copy, Check, UserPlus, Loader2 } from 'lucide-react'
-import { useUiPreferences } from '../lib/uiPreferences'
+import { useUiPreferences } from '../lib/useUiPreferences'
 import { assignFace, getActors } from '../lib/api'
 
 interface ResultsPanelProps {

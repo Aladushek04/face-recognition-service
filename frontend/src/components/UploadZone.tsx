@@ -12,7 +12,7 @@ import {
 import type { FileRejection } from 'react-dropzone'
 import { uploadImage } from '../lib/api'
 import { useAppStore } from '../hooks/useStore'
-import { useUiPreferences } from '../lib/uiPreferences'
+import { useUiPreferences } from '../lib/useUiPreferences'
 import type { UploadResponse } from '../types'
 
 type QueueStatus = 'pending' | 'processing' | 'done' | 'error' | 'canceled'

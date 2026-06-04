@@ -35,7 +35,7 @@ import {
   addActorToVideo,
   removeActorFromVideo,
 } from '../lib/api'
-import { useUiPreferences } from '../lib/uiPreferences'
+import { useUiPreferences } from '../lib/useUiPreferences'
 import type { Video, Actor } from '../types'
 
 export function VideosPanel() {
@@ -554,10 +554,10 @@ export function VideosPanel() {
                             <RefreshCw size={12} className="animate-spin" />
                             <span className="text-[8px] font-bold">{video.progress ?? 0}%</span>
                           </div>
-                        ) : (
+                        ) : video.thumbnail_url ? (
                           <>
                             <img
-                              src={`/api/thumbnails/${video.id}.jpg?t=${new Date(video.updated_at).getTime()}`}
+                              src={`${video.thumbnail_url}?t=${new Date(video.updated_at).getTime()}`}
                               alt={video.filename}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -570,6 +570,10 @@ export function VideosPanel() {
                               <Film size={16} />
                             </div>
                           </>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-on-surface-variant/40 bg-surface-container-high/50">
+                            <Film size={16} />
+                          </div>
                         )}
                       </div>
                     </td>
@@ -717,10 +721,10 @@ function VideoCard({
               <RefreshCw size={24} className="animate-spin" />
               <span className="text-[10px] font-bold uppercase tracking-wider">{video.progress ?? 0}%</span>
             </div>
-          ) : (
+          ) : video.thumbnail_url ? (
             <>
               <img
-                src={`/api/thumbnails/${video.id}.jpg?t=${new Date(video.updated_at).getTime()}`}
+                src={`${video.thumbnail_url}?t=${new Date(video.updated_at).getTime()}`}
                 alt={video.filename}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -735,6 +739,10 @@ function VideoCard({
                 <Film size={32} />
               </div>
             </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-on-surface-variant/40 bg-surface-container-high/50">
+              <Film size={32} />
+            </div>
           )}
           {video.status === 'completed' && (
             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer" onClick={onOpen}>

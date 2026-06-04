@@ -30,6 +30,13 @@ def _decode_json_list(value: object) -> list[str]:
     return []
 
 
+def _video_thumbnail_url(video_id: int) -> str | None:
+    thumb_path = Path(settings.base_dir) / "thumbnails" / f"{video_id}.jpg"
+    if not thumb_path.exists():
+        return None
+    return f"/api/thumbnails/{video_id}.jpg"
+
+
 @router.get("")
 def list_videos(
     search: Optional[str] = None,
@@ -72,6 +79,7 @@ def list_videos(
         for video in videos:
             v_dict = dict(video)
             v_dict["stashdb_performers"] = _decode_json_list(v_dict.get("stashdb_performers"))
+            v_dict["thumbnail_url"] = _video_thumbnail_url(v_dict["id"])
             
             # Fetch distinct actors detected in this video
             actors = conn.execute(
@@ -117,6 +125,7 @@ def get_video(video_id: int):
             
         video_dict = dict(video)
         video_dict["stashdb_performers"] = _decode_json_list(video_dict.get("stashdb_performers"))
+        video_dict["thumbnail_url"] = _video_thumbnail_url(video_dict["id"])
         video_dict["detections"] = formatted_detections
         
         # Extract unique actors found in detections

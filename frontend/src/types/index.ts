@@ -88,6 +88,7 @@ export interface Video {
   status: 'unprocessed' | 'processing' | 'completed' | 'failed'
   error_message: string | null
   progress?: number
+  thumbnail_url?: string | null
   stashdb_scene_id?: string | null
   stashdb_performers?: string[]
   created_at: string

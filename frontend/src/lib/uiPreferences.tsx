@@ -1,8 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-
-type Language = 'en' | 'ru'
-type Theme = 'light' | 'dark'
+import { UiPreferencesContext, type Language, type Theme, type UiPreferences } from './uiPreferencesContext'
 
 const translations = {
   en: {
@@ -235,18 +233,6 @@ const translations = {
 
 type TranslationKey = keyof typeof translations.en
 
-interface UiPreferences {
-  language: Language
-  theme: Theme
-  privacyMode: boolean
-  setLanguage: (language: Language) => void
-  setTheme: (theme: Theme) => void
-  setPrivacyMode: (enabled: boolean) => void
-  t: (key: TranslationKey) => string
-}
-
-const UiPreferencesContext = createContext<UiPreferences | null>(null)
-
 function storedLanguage(): Language {
   const value = localStorage.getItem('frs-language')
   return value === 'ru' || value === 'en' ? value : 'en'
@@ -288,18 +274,10 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
       setLanguage: setLanguageState,
       setTheme: setThemeState,
       setPrivacyMode: setPrivacyModeState,
-      t: (key) => translations[language][key] ?? translations.en[key],
+      t: (key) => translations[language][key as TranslationKey] ?? translations.en[key as TranslationKey] ?? key,
     }),
     [language, privacyMode, theme],
   )
 
   return <UiPreferencesContext.Provider value={value}>{children}</UiPreferencesContext.Provider>
-}
-
-export function useUiPreferences() {
-  const context = useContext(UiPreferencesContext)
-  if (!context) {
-    throw new Error('useUiPreferences must be used inside UiPreferencesProvider')
-  }
-  return context
 }

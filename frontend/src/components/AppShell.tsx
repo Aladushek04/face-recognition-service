@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Activity, Camera, Database, Eye, EyeOff, Moon, Sun } from 'lucide-react'
-import { useUiPreferences } from '../lib/uiPreferences'
+import { useUiPreferences } from '../lib/useUiPreferences'
 import type { HealthStatus } from '../types'
 
 export type AppView = 'upload' | 'actors' | 'videos'

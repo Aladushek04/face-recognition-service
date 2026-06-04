@@ -27,7 +27,7 @@ import {
   importStashdbPerformer,
 } from '../lib/api'
 import { useAppStore } from '../hooks/useStore'
-import { useUiPreferences } from '../lib/uiPreferences'
+import { useUiPreferences } from '../lib/useUiPreferences'
 import type { Actor } from '../types'
 
 interface ActorsPanelProps {

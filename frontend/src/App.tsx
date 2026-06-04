@@ -7,7 +7,7 @@ import { ActorsPanel } from './components/ActorsPanel'
 import { VideosPanel } from './components/VideosPanel'
 import { useAppStore } from './hooks/useStore'
 import { getHealth } from './lib/api'
-import { useUiPreferences } from './lib/uiPreferences'
+import { useUiPreferences } from './lib/useUiPreferences'
 import type { HealthStatus, UploadResponse } from './types'
 import type { AppView } from './components/AppShell'
 
