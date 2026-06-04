@@ -337,6 +337,12 @@ GET  /api/health
 GET  /api/index/status
 POST /api/index/rebuild
 
+GET  /api/tools/jobs
+GET  /api/tools/jobs/{job_id}
+GET  /api/tools/jobs/{job_id}/logs
+POST /api/tools/jobs/{job_type}
+POST /api/tools/jobs/{job_id}/cancel
+
 POST /api/upload
 POST /api/upload/batch
 GET  /api/uploads/{image_id}
@@ -380,6 +386,24 @@ curl.exe -X POST http://127.0.0.1:8000/api/upload -F "file=@photo.jpg"
 
 ```powershell
 curl.exe -X POST "http://127.0.0.1:8000/api/index/rebuild?refresh_cache=false"
+```
+
+Maintenance jobs API examples are documented in:
+
+```text
+docs/MAINTENANCE_JOB_API.md
+```
+
+Quick dry-run example:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/api/tools/jobs/cleanup_actors -H "Content-Type: application/json" -d "{\"args\":[\"--require-image\",\"--include-unknown\"]}"
+```
+
+Quick apply example:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/api/tools/jobs/cleanup_actors -H "Content-Type: application/json" -d "{\"apply\":true,\"args\":[\"--require-image\",\"--include-unknown\"]}"
 ```
 
 ## Docker
