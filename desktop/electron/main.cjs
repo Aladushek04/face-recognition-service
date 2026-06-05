@@ -12,6 +12,9 @@ app.setAppUserModelId('local.face-recognition-service')
 const isPackaged = app.isPackaged
 const ROOT_DIR = isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', '..')
 const BACKEND_DIR = isPackaged ? path.join(process.resourcesPath, 'backend') : path.join(ROOT_DIR, 'backend')
+const BUNDLED_BACKEND_EXE = isPackaged
+  ? path.join(process.resourcesPath, 'backend-bin', 'backend.exe')
+  : path.join(__dirname, 'backend-dist', 'backend', 'backend.exe')
 const FRONTEND_DIST = isPackaged
   ? path.join(process.resourcesPath, 'frontend', 'index.html')
   : path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
@@ -145,7 +148,7 @@ function waitForHttp(url, timeoutMs = 90000) {
 }
 
 function startBackend(port) {
-  const python = process.env.FACE_SERVICE_PYTHON || 'python'
+  const backendCommand = resolveBackendCommand()
   const runtimeEnv = loadRuntimeEnv()
   const baseDir = runtimeEnv.BASE_DIR || process.env.BASE_DIR || DEFAULT_RUNTIME_DIR
   runtimeDir = baseDir
@@ -161,12 +164,12 @@ function startBackend(port) {
   }
   const log = fs.createWriteStream(backendLogPath, { flags: 'a' })
   log.write(`[desktop] Starting backend on 127.0.0.1:${port}\n`)
-  log.write(`[desktop] Command: ${python} main.py\n\n`)
+  log.write(`[desktop] Command: ${backendCommand.label}\n\n`)
   log.write(`[desktop] BASE_DIR=${env.BASE_DIR}\n`)
   log.write(`[desktop] .env source=${runtimeEnv.__source || 'none'}\n\n`)
 
-  backendProcess = spawn(python, ['main.py'], {
-    cwd: BACKEND_DIR,
+  backendProcess = spawn(backendCommand.file, backendCommand.args, {
+    cwd: backendCommand.cwd,
     env,
     windowsHide: true,
   })
@@ -185,6 +188,26 @@ function startBackend(port) {
   backendProcess.on('error', (error) => {
     log.write(`\n[desktop] Backend spawn error: ${error.stack || error.message}\n`)
   })
+}
+
+function resolveBackendCommand() {
+  if (fs.existsSync(BUNDLED_BACKEND_EXE)) {
+    return {
+      file: BUNDLED_BACKEND_EXE,
+      args: [],
+      cwd: path.dirname(BUNDLED_BACKEND_EXE),
+      label: BUNDLED_BACKEND_EXE,
+      bundled: true,
+    }
+  }
+  const python = process.env.FACE_SERVICE_PYTHON || 'python'
+  return {
+    file: python,
+    args: ['main.py'],
+    cwd: BACKEND_DIR,
+    label: `${python} main.py`,
+    bundled: false,
+  }
 }
 
 function loadRuntimeEnv() {
@@ -233,6 +256,9 @@ function stopBackend() {
 }
 
 function checkPython() {
+  if (fs.existsSync(BUNDLED_BACKEND_EXE)) {
+    return `Bundled backend: ${BUNDLED_BACKEND_EXE}`
+  }
   const python = process.env.FACE_SERVICE_PYTHON || 'python'
   const result = spawnSync(python, ['--version'], {
     cwd: ROOT_DIR,

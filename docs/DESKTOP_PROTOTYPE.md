@@ -37,6 +37,12 @@ Build a first portable Windows package:
 npm run desktop:build
 ```
 
+Build a portable package with bundled backend:
+
+```powershell
+npm run desktop:build:bundled
+```
+
 Output:
 
 ```text
@@ -50,13 +56,29 @@ The portable build includes:
 - Electron shell.
 - Built React frontend from `frontend/dist`.
 - Backend Python source from `backend`.
+- Bundled `backend.exe` from `desktop/electron/backend-dist/backend` when
+  `npm run backend:build` or `npm run desktop:build:bundled` was run first.
 - Project scripts from `scripts`.
 - Small static icons from `data/icons`.
 - Windows app icon from `desktop/electron/assets/app-icon.ico`.
 
-The portable build does not bundle Python yet. The target machine still needs a
-working Python environment with backend dependencies installed, or
+Bundled mode packages the Python backend through PyInstaller. Runtime data is
+still external: actor DB, photos, FAISS indexes, videos, uploads, thumbnails,
+and downloaded ML models are not packaged.
+
+If bundled `backend.exe` is not present, Electron falls back to a normal Python
+run. The target machine then needs backend dependencies installed, or
 `FACE_SERVICE_PYTHON` must point to the intended Python executable.
+
+Build only the backend bundle:
+
+```powershell
+npm run backend:build
+```
+
+The backend bundle is intentionally ignored by git. It is a generated artifact
+and currently weighs about 1.5 GB with OpenCV, InsightFace, onnxruntime, FAISS,
+SciPy, scikit-image, and matplotlib.
 
 For portable `file://` loading the frontend is built with relative assets. If
 the app window is blank, rebuild with `npm run desktop:build` and run the
@@ -78,7 +100,11 @@ VIDEOS_DIR=D:\Videos
 ## Notes
 
 - `FACE_SERVICE_PYTHON` can override the Python executable used by Electron.
+- Electron starts bundled `backend.exe` first when present, then falls back to
+  `FACE_SERVICE_PYTHON` or `python main.py`.
 - Backend startup logs are written to `logs/desktop-backend-*.log`.
+- Bundled backend crash logs are also written beside the executable as
+  `backend-startup.log`.
 - The desktop shell shows a startup screen while it prepares logs, finds a free
   backend port, checks Python, starts the backend, waits for health, and loads
   the UI.

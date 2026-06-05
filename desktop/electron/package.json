@@ -26,6 +26,13 @@
     ],
     "extraResources": [
       {
+        "from": "backend-dist/backend",
+        "to": "backend-bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
         "from": "../../backend",
         "to": "backend",
         "filter": [

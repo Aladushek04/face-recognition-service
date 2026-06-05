@@ -220,7 +220,38 @@ Acceptance criteria:
 - No actor DB, models, videos, FAISS indexes, or thumbnails are packaged.
 - Logs are available from the UI and from disk.
 
-## Phase 5 - WebView2 Shell Evaluation
+## Phase 5 - Python Backend Bundle
+
+Goal: remove the normal requirement for a separately installed Python runtime in
+desktop portable builds.
+
+Packaging direction:
+
+- Build `backend.exe` with PyInstaller.
+- Package generated backend files as Electron `extraResources`.
+- Keep runtime data external:
+  - actor DB;
+  - actor photos;
+  - FAISS indexes;
+  - videos;
+  - thumbnails;
+  - uploads;
+  - downloaded ML models.
+- Electron startup order:
+  - use bundled `backend.exe` when present;
+  - otherwise fall back to `FACE_SERVICE_PYTHON`;
+  - otherwise fall back to `python main.py`.
+- Keep browser-local mode unchanged.
+
+Acceptance criteria:
+
+- `npm run backend:build` creates `desktop/electron/backend-dist/backend/backend.exe`.
+- Bundled backend starts and answers `/api/health`.
+- `npm run desktop:build:bundled` builds a portable package with bundled backend.
+- Generated backend bundle stays ignored by git.
+- Missing CUDA/TensorRT DLLs do not block CPU provider startup.
+
+## Phase 6 - WebView2 Shell Evaluation
 
 Goal: decide whether replacing Electron is worth it.
 
@@ -240,7 +271,7 @@ Acceptance criteria:
 - Backend lifecycle behavior matches Electron.
 - Installer/runtime story is simpler or lighter enough to justify migration.
 
-## Phase 6 - Hardening
+## Phase 7 - Hardening
 
 Goal: make the desktop app boringly reliable.
 
@@ -272,4 +303,5 @@ Default order for future work:
 3. Add React maintenance UI.
 4. Add Electron shell.
 5. Package portable app.
-6. Evaluate WebView2 replacement.
+6. Bundle Python backend.
+7. Evaluate WebView2 replacement.
