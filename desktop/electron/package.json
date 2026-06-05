@@ -21,6 +21,7 @@
     },
     "files": [
       "main.cjs",
+      "assets/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -57,6 +58,7 @@
       }
     ],
     "win": {
+      "icon": "assets/app-icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {

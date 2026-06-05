@@ -52,6 +52,7 @@ The portable build includes:
 - Backend Python source from `backend`.
 - Project scripts from `scripts`.
 - Small static icons from `data/icons`.
+- Windows app icon from `desktop/electron/assets/app-icon.ico`.
 
 The portable build does not bundle Python yet. The target machine still needs a
 working Python environment with backend dependencies installed, or
@@ -83,6 +84,9 @@ VIDEOS_DIR=D:\Videos
   the UI.
 - The app menu has shortcuts for opening the logs folder and the current backend
   log.
+- The app menu has an `Open Runtime Folder` action. By default portable mode
+  uses `D:\FaceService` unless `.env`, process environment, or
+  `FACE_SERVICE_PYTHON`/runtime overrides point elsewhere.
 - If Python is missing, backend startup times out, or the backend process exits
   unexpectedly, the shell shows a readable failure screen with the log path.
 - The React frontend receives the backend URL through `?apiBaseUrl=...`, so

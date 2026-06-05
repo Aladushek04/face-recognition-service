@@ -14,6 +14,9 @@ const BACKEND_DIR = isPackaged ? path.join(process.resourcesPath, 'backend') : p
 const FRONTEND_DIST = isPackaged
   ? path.join(process.resourcesPath, 'frontend', 'index.html')
   : path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
+const ICON_PATH = isPackaged
+  ? path.join(process.resourcesPath, 'assets', 'app-icon.ico')
+  : path.join(__dirname, 'assets', 'app-icon.ico')
 const LOG_DIR = isPackaged ? path.join(app.getPath('userData'), 'logs') : path.join(ROOT_DIR, 'logs')
 const isDev = process.argv.includes('--dev') || process.env.ELECTRON_DEV === '1'
 const isSmokeTest = process.argv.includes('--smoke-test')
@@ -25,6 +28,7 @@ let backendProcess = null
 let mainWindow = null
 let backendLogPath = null
 let isQuitting = false
+let runtimeDir = DEFAULT_RUNTIME_DIR
 
 function ensureLogDir() {
   fs.mkdirSync(LOG_DIR, { recursive: true })
@@ -39,6 +43,7 @@ function createMainWindow(options = {}) {
     minWidth: 980,
     minHeight: 680,
     backgroundColor: '#0b1120',
+    icon: ICON_PATH,
     title: options.title || 'Face Recognition Service',
     webPreferences: {
       nodeIntegration: false,
@@ -56,6 +61,10 @@ function installMenu() {
         {
           label: 'Open Logs Folder',
           click: () => shell.openPath(LOG_DIR),
+        },
+        {
+          label: 'Open Runtime Folder',
+          click: () => shell.openPath(runtimeDir),
         },
         {
           label: 'Open Backend Log',
@@ -132,6 +141,8 @@ function startBackend(port) {
   const python = process.env.FACE_SERVICE_PYTHON || 'python'
   const runtimeEnv = loadRuntimeEnv()
   const baseDir = runtimeEnv.BASE_DIR || process.env.BASE_DIR || DEFAULT_RUNTIME_DIR
+  runtimeDir = baseDir
+  fs.mkdirSync(baseDir, { recursive: true })
   const env = {
     ...process.env,
     ...runtimeEnv,
