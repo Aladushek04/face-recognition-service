@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "runtime": {
-    "baseDir": "D:\\FaceService",
-    "actorsDir": "D:\\FaceService\\actors",
-    "modelsDir": "D:\\FaceService\\models",
-    "faissIndexDir": "D:\\FaceService\\data\\faiss_index",
-    "videosDir": "D:\\Videos",
+    "baseDir": "",
+    "actorsDir": "",
+    "modelsDir": "",
+    "faissIndexDir": "",
+    "videosDir": "",
     "jobsDir": "",
     "logsDir": ""
   },

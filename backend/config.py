@@ -26,15 +26,18 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Paths
-    base_dir: Path = get_base_dir()
+    base_dir: Path | None = None
     actors_dir: Path | None = None
     faiss_index_dir: Path | None = None
-    videos_dir: Path = Path("D:/Videos")
+    videos_dir: Path | None = None
     jobs_dir: Path | None = None
     logs_dir: Path | None = None
 
     @model_validator(mode="after")
     def resolve_dependent_paths(self) -> "Settings":
+        if self.base_dir is None or str(self.base_dir).strip() == "":
+            self.base_dir = get_base_dir()
+            
         if self.actors_dir is None:
             self.actors_dir = self.base_dir / "data" / "actors"
         if self.faiss_index_dir is None:

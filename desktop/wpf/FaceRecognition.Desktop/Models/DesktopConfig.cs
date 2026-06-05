@@ -20,19 +20,19 @@ public class DesktopConfig
 public class RuntimeConfig
 {
     [JsonPropertyName("baseDir")]
-    public string BaseDir { get; set; } = @"D:\FaceService";
+    public string BaseDir { get; set; } = "";
 
     [JsonPropertyName("actorsDir")]
-    public string ActorsDir { get; set; } = @"D:\FaceService\actors";
+    public string ActorsDir { get; set; } = "";
 
     [JsonPropertyName("modelsDir")]
-    public string ModelsDir { get; set; } = @"D:\FaceService\models";
+    public string ModelsDir { get; set; } = "";
 
     [JsonPropertyName("faissIndexDir")]
-    public string FaissIndexDir { get; set; } = @"D:\FaceService\data\faiss_index";
+    public string FaissIndexDir { get; set; } = "";
 
     [JsonPropertyName("videosDir")]
-    public string VideosDir { get; set; } = @"D:\Videos";
+    public string VideosDir { get; set; } = "";
 
     [JsonPropertyName("jobsDir")]
     public string JobsDir { get; set; } = Services.AppPaths.LocalJobsDir;
