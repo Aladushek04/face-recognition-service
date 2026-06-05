@@ -57,6 +57,9 @@ public static class AppPaths
 
     public static string LogsPath => Path.Combine(ExecutableRoot, "logs");
     
+    public static string LocalDataDir => Path.Combine(ExecutableRoot, "data");
+    public static string LocalJobsDir => Path.Combine(LocalDataDir, "jobs");
+    
     // We leave data paths unchanged, as the user said "Do not replace hardcoded D:\FaceService paths yet", but AppPaths had some defaults.
     public static string DataPath => Path.Combine(ExecutableRoot, "data");
     public static string ModelsPath => Path.Combine(ExecutableRoot, "models");

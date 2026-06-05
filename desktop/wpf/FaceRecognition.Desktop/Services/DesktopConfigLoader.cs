@@ -23,7 +23,10 @@ public static class DesktopConfigLoader
             {
                 var json = File.ReadAllText(configPath);
                 var config = JsonSerializer.Deserialize<DesktopConfig>(json, JsonOptions);
-                return config ?? new DesktopConfig();
+                config ??= new DesktopConfig();
+                
+                ValidateAndFallbackPaths(config);
+                return config;
             }
             catch (Exception ex)
             {
@@ -45,6 +48,39 @@ public static class DesktopConfigLoader
             File.AppendAllText(Path.Combine(AppPaths.LogsPath, "app.log"), $"[Error] Failed to write default config to {configPath}: {ex.Message}\n");
         }
 
+        ValidateAndFallbackPaths(defaultConfig);
         return defaultConfig;
+    }
+
+    private static void ValidateAndFallbackPaths(DesktopConfig config)
+    {
+        if (config.Runtime != null)
+        {
+            if (string.IsNullOrEmpty(config.Runtime.JobsDir))
+            {
+                config.Runtime.JobsDir = AppPaths.LocalJobsDir;
+            }
+            else
+            {
+                var jobsRoot = Path.GetPathRoot(config.Runtime.JobsDir);
+                if (!string.IsNullOrEmpty(jobsRoot) && !Directory.Exists(jobsRoot))
+                {
+                    config.Runtime.JobsDir = AppPaths.LocalJobsDir;
+                }
+            }
+            
+            if (string.IsNullOrEmpty(config.Runtime.LogsDir))
+            {
+                config.Runtime.LogsDir = AppPaths.LogsPath;
+            }
+            else
+            {
+                var logsRoot = Path.GetPathRoot(config.Runtime.LogsDir);
+                if (!string.IsNullOrEmpty(logsRoot) && !Directory.Exists(logsRoot))
+                {
+                    config.Runtime.LogsDir = AppPaths.LogsPath;
+                }
+            }
+        }
     }
 }

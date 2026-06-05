@@ -35,10 +35,10 @@ public class RuntimeConfig
     public string VideosDir { get; set; } = @"D:\Videos";
 
     [JsonPropertyName("jobsDir")]
-    public string JobsDir { get; set; } = @"D:\FaceService\data\jobs";
+    public string JobsDir { get; set; } = Services.AppPaths.LocalJobsDir;
 
     [JsonPropertyName("logsDir")]
-    public string LogsDir { get; set; } = @"D:\FaceService\logs";
+    public string LogsDir { get; set; } = Services.AppPaths.LogsPath;
 }
 
 public class BackendConfig
