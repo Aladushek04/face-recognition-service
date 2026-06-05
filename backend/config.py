@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     actors_dir: Path | None = None
     faiss_index_dir: Path | None = None
     videos_dir: Path = Path("D:/Videos")
+    jobs_dir: Path | None = None
+    logs_dir: Path | None = None
 
     @model_validator(mode="after")
     def resolve_dependent_paths(self) -> "Settings":
@@ -37,6 +39,22 @@ class Settings(BaseSettings):
             self.actors_dir = self.base_dir / "data" / "actors"
         if self.faiss_index_dir is None:
             self.faiss_index_dir = self.base_dir / "data" / "faiss_index"
+
+        def _fallback_path(current: Path | None, fallback_suffix: str) -> Path:
+            if not current or str(current).strip() == "":
+                return self.base_dir / fallback_suffix
+            try:
+                # Check if the drive root exists
+                if current.anchor and not Path(current.anchor).exists():
+                    print(f"Setup mode detected: using portable-local {fallback_suffix} directory.")
+                    return self.base_dir / fallback_suffix
+            except Exception:
+                pass
+            return current
+
+        self.jobs_dir = _fallback_path(self.jobs_dir, "data/jobs")
+        self.logs_dir = _fallback_path(self.logs_dir, "logs")
+
         return self
 
     @property

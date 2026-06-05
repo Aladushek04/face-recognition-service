@@ -17,7 +17,6 @@ from config import settings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-JOBS_DIR = settings.base_dir / "data" / "jobs"
 
 
 @dataclass(frozen=True)
@@ -53,11 +52,16 @@ class JobManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._processes: dict[str, subprocess.Popen] = {}
-        JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            settings.jobs_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass  # Fallback to local later or allow UI config required
         self._recover_running_jobs()
 
     def list_jobs(self) -> list[dict[str, Any]]:
-        jobs = [self._read_job(path) for path in JOBS_DIR.glob("*.json")]
+        if not settings.jobs_dir.exists():
+            return []
+        jobs = [self._read_job(path) for path in settings.jobs_dir.glob("*.json")]
         return sorted(
             (job for job in jobs if job),
             key=lambda item: float(item.get("created_at") or 0),
@@ -108,7 +112,7 @@ class JobManager:
                 raise RuntimeError("Another heavy maintenance job is already running")
 
             job_id = uuid.uuid4().hex
-            log_path = JOBS_DIR / f"{job_id}.log"
+            log_path = settings.jobs_dir / f"{job_id}.log"
             job = {
                 "id": job_id,
                 "type": job_type,
@@ -277,7 +281,7 @@ class JobManager:
     def _metadata_path(self, job_id: str) -> Path:
         if not re_valid_job_id(job_id):
             raise ValueError("Invalid job id")
-        return JOBS_DIR / f"{job_id}.json"
+        return settings.jobs_dir / f"{job_id}.json"
 
     def _read_job(self, path: Path) -> dict[str, Any] | None:
         try:
