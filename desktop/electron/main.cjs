@@ -1,5 +1,5 @@
-const { app, BrowserWindow } = require('electron')
-const { spawn } = require('child_process')
+const { app, BrowserWindow, Menu, shell } = require('electron')
+const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const http = require('http')
 const net = require('net')
@@ -17,10 +17,61 @@ const isSmokeTest = process.argv.includes('--smoke-test')
 let backendProcess = null
 let mainWindow = null
 let backendLogPath = null
+let isQuitting = false
 
 function ensureLogDir() {
   fs.mkdirSync(LOG_DIR, { recursive: true })
   backendLogPath = path.join(LOG_DIR, `desktop-backend-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
+}
+
+function createMainWindow(options = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
+  mainWindow = new BrowserWindow({
+    width: options.width || 1280,
+    height: options.height || 860,
+    minWidth: 980,
+    minHeight: 680,
+    backgroundColor: '#0b1120',
+    title: options.title || 'Face Recognition Service',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  })
+  return mainWindow
+}
+
+function installMenu() {
+  const template = [
+    {
+      label: 'App',
+      submenu: [
+        {
+          label: 'Open Logs Folder',
+          click: () => shell.openPath(LOG_DIR),
+        },
+        {
+          label: 'Open Backend Log',
+          enabled: Boolean(backendLogPath),
+          click: () => backendLogPath && shell.openPath(backendLogPath),
+        },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+      ],
+    },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 function findFreePort() {
@@ -93,8 +144,11 @@ function startBackend(port) {
   backendProcess.stderr.pipe(log)
   backendProcess.on('exit', (code, signal) => {
     log.write(`\n[desktop] Backend exited code=${code} signal=${signal}\n`)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('backend-exited', { code, signal })
+    if (!isQuitting && mainWindow && !mainWindow.isDestroyed()) {
+      showFatalScreen(
+        'Backend stopped unexpectedly',
+        `The local backend process exited while the desktop app was running.\n\nExit code: ${code}\nSignal: ${signal || 'none'}\n\nBackend log:\n${backendLogPath}`,
+      )
     }
   })
   backendProcess.on('error', (error) => {
@@ -108,9 +162,34 @@ function stopBackend() {
   backendProcess = null
 }
 
-function htmlError(title, body) {
+function checkPython() {
+  const python = process.env.FACE_SERVICE_PYTHON || 'python'
+  const result = spawnSync(python, ['--version'], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  if (result.error) {
+    throw new Error(`Could not start Python executable "${python}".\n\n${result.error.message}`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`Python version check failed for "${python}".\n\n${result.stderr || result.stdout}`)
+  }
+  return `${python}: ${(result.stdout || result.stderr || '').trim()}`
+}
+
+function htmlPage(title, body, options = {}) {
   const escapedTitle = escapeHtml(title)
   const escapedBody = escapeHtml(body)
+  const escapedEyebrow = escapeHtml(options.eyebrow || 'Face Recognition Service')
+  const statusItems = options.steps || []
+  const stepsHtml = statusItems
+    .map((step) => {
+      const tone = step.done ? '#22c55e' : step.active ? '#93c5fd' : '#64748b'
+      const bullet = step.done ? '✓' : step.active ? '•' : '○'
+      return `<li style="color:${tone}"><span>${bullet}</span><strong>${escapeHtml(step.label)}</strong></li>`
+    })
+    .join('')
   return `data:text/html;charset=utf-8,${encodeURIComponent(`
 <!doctype html>
 <html>
@@ -135,7 +214,31 @@ function htmlError(title, body) {
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
         padding: 28px;
       }
+      .eyebrow {
+        color: #93c5fd;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+      }
       h1 { margin: 0 0 12px; font-size: 28px; }
+      p { color: #cbd5e1; line-height: 1.6; }
+      ul {
+        display: grid;
+        gap: 10px;
+        list-style: none;
+        margin: 18px 0;
+        padding: 0;
+      }
+      li {
+        align-items: center;
+        border: 1px solid #334155;
+        border-radius: 14px;
+        display: flex;
+        gap: 10px;
+        padding: 10px 12px;
+      }
       pre {
         white-space: pre-wrap;
         overflow: auto;
@@ -149,12 +252,20 @@ function htmlError(title, body) {
   </head>
   <body>
     <main>
+      <div class="eyebrow">${escapedEyebrow}</div>
       <h1>${escapedTitle}</h1>
-      <p>Desktop shell could not start the local backend.</p>
+      <p>${escapeHtml(options.description || '')}</p>
+      ${stepsHtml ? `<ul>${stepsHtml}</ul>` : ''}
       <pre>${escapedBody}</pre>
     </main>
   </body>
 </html>`)}`
+}
+
+function htmlError(title, body) {
+  return htmlPage(title, body, {
+    description: 'Desktop shell could not start the local backend.',
+  })
 }
 
 function escapeHtml(value) {
@@ -166,18 +277,7 @@ function escapeHtml(value) {
 }
 
 async function openFrontend(apiBaseUrl) {
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    minWidth: 980,
-    minHeight: 680,
-    backgroundColor: '#0b1120',
-    title: 'Face Recognition Service',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  })
+  createMainWindow()
 
   const encodedApi = encodeURIComponent(apiBaseUrl)
   if (isDev) {
@@ -195,36 +295,73 @@ async function openFrontend(apiBaseUrl) {
   await mainWindow.loadURL(fileUrl)
 }
 
+async function showStartupScreen(activeStep, detail = '') {
+  const steps = [
+    'Prepare logs',
+    'Find backend port',
+    'Check Python',
+    'Start backend',
+    'Wait for health',
+    'Load app UI',
+  ]
+  const activeIndex = steps.indexOf(activeStep)
+  createMainWindow({ title: 'Face Recognition Service - starting' })
+  await mainWindow.loadURL(htmlPage('Starting local service', detail || activeStep, {
+    description: 'The desktop app is preparing the local backend and UI.',
+    steps: steps.map((label, index) => ({
+      label,
+      done: activeIndex > index,
+      active: activeIndex === index,
+    })),
+  }))
+}
+
+async function showFatalScreen(title, detail) {
+  createMainWindow({
+    width: 960,
+    height: 680,
+    title: `Face Recognition Service - ${title}`,
+  })
+  await mainWindow.loadURL(htmlError(title, detail))
+}
+
 async function boot() {
   ensureLogDir()
-  const port = await findFreePort()
-  const apiBaseUrl = `http://127.0.0.1:${port}/api`
-
-  startBackend(port)
+  installMenu()
   try {
+    await showStartupScreen('Prepare logs', `Backend log:\n${backendLogPath}`)
+    await showStartupScreen('Find backend port')
+    const port = await findFreePort()
+    const apiBaseUrl = `http://127.0.0.1:${port}/api`
+
+    await showStartupScreen('Check Python')
+    const pythonVersion = checkPython()
+
+    await showStartupScreen('Start backend', `${pythonVersion}\nBackend log:\n${backendLogPath}`)
+    startBackend(port)
+
+    await showStartupScreen('Wait for health', `Waiting for http://127.0.0.1:${port}/api/health`)
     await waitForHttp(`http://127.0.0.1:${port}/api/health`)
+
+    await showStartupScreen('Load app UI', `API: ${apiBaseUrl}`)
     await openFrontend(apiBaseUrl)
     if (isSmokeTest) {
       setTimeout(() => app.quit(), 2500)
     }
   } catch (error) {
-    mainWindow = new BrowserWindow({
-      width: 960,
-      height: 680,
-      backgroundColor: '#0b1120',
-      title: 'Face Recognition Service - startup failed',
-    })
-    await mainWindow.loadURL(htmlError('Backend startup failed', `${error.stack || error.message}\n\nBackend log:\n${backendLogPath}`))
+    await showFatalScreen('Backend startup failed', `${error.stack || error.message}\n\nBackend log:\n${backendLogPath}`)
   }
 }
 
 app.whenReady().then(boot)
 
 app.on('window-all-closed', () => {
+  isQuitting = true
   stopBackend()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
+  isQuitting = true
   stopBackend()
 })

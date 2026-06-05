@@ -45,5 +45,12 @@ VIDEOS_DIR=D:\Videos
 
 - `FACE_SERVICE_PYTHON` can override the Python executable used by Electron.
 - Backend startup logs are written to `logs/desktop-backend-*.log`.
+- The desktop shell shows a startup screen while it prepares logs, finds a free
+  backend port, checks Python, starts the backend, waits for health, and loads
+  the UI.
+- The app menu has shortcuts for opening the logs folder and the current backend
+  log.
+- If Python is missing, backend startup times out, or the backend process exits
+  unexpectedly, the shell shows a readable failure screen with the log path.
 - The React frontend receives the backend URL through `?apiBaseUrl=...`, so
   ordinary React components stay independent of Electron APIs.
