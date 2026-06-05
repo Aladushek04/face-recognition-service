@@ -50,9 +50,9 @@ New-Item -ItemType Directory -Force -Path $ReleaseTargetDir | Out-Null
 # 4. Copy required files
 Write-Host "Copying files to $ReleaseTargetDir..."
 
-# WPF Executables and DLLs
-Get-ChildItem -Path $PublishOutputDir -File | Where-Object { $_.Name -ne "config.json" } | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination $ReleaseTargetDir -Force
+# WPF Executables, DLLs, and Runtimes
+Get-ChildItem -Path $PublishOutputDir | Where-Object { $_.Name -notin @("config.json", "frontend", "backend") } | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $ReleaseTargetDir -Recurse -Force
 }
 
 # Frontend

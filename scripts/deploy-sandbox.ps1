@@ -65,9 +65,9 @@ if (-not (Test-Path $OutputDir)) {
 
 Write-Host "Copying files to $OutputDir..."
 
-# Copy WPF Executables and DLLs
-Get-ChildItem -Path $PublishOutputDir -File | Where-Object { $_.Name -ne "config.json" } | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination $OutputDir -Force
+# Copy WPF Executables, DLLs, and Runtimes
+Get-ChildItem -Path $PublishOutputDir | Where-Object { $_.Name -notin @("config.json", "frontend", "backend") } | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $OutputDir -Recurse -Force
 }
 
 # Copy Frontend
