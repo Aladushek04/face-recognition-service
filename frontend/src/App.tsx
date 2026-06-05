@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Upload, Users, Camera, Film } from 'lucide-react'
+import { Upload, Users, Camera, Film, Wrench } from 'lucide-react'
 import { AppShell } from './components/AppShell'
 import { UploadZone } from './components/UploadZone'
 import { ResultsPanel } from './components/ResultsPanel'
 import { ActorsPanel } from './components/ActorsPanel'
 import { VideosPanel } from './components/VideosPanel'
+import { MaintenancePanel } from './components/MaintenancePanel'
 import { useAppStore } from './hooks/useStore'
 import { getHealth } from './lib/api'
 import { useUiPreferences } from './lib/useUiPreferences'
@@ -42,6 +43,7 @@ function App() {
     { id: 'upload' as const, label: language === 'ru' ? 'Поиск' : 'Upload', icon: Upload },
     { id: 'actors' as const, label: language === 'ru' ? 'База' : 'Actors', icon: Users },
     { id: 'videos' as const, label: language === 'ru' ? 'Видео' : 'Videos', icon: Film },
+    { id: 'maintenance' as const, label: language === 'ru' ? 'Сервис' : 'Tools', icon: Wrench },
   ]
 
   return (
@@ -87,6 +89,11 @@ function App() {
       {activeView === 'videos' && (
         <section className="md-card p-5 lg:p-6">
           <VideosPanel />
+        </section>
+      )}
+      {activeView === 'maintenance' && (
+        <section className="md-card p-5 lg:p-6">
+          <MaintenancePanel />
         </section>
       )}
     </AppShell>

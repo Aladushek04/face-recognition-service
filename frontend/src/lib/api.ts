@@ -3,6 +3,8 @@ import type {
   ActorListResponse,
   BatchUploadResponse,
   HealthStatus,
+  ToolJob,
+  ToolJobsResponse,
   UploadResponse,
   Video,
 } from '../types'
@@ -504,6 +506,65 @@ export async function getIndexStatus(): Promise<{
   const response = await fetch(`${API_BASE}/index/status`)
   if (!response.ok) {
     throw await responseError(response, 'Failed to fetch index status')
+  }
+  return response.json()
+}
+
+export async function getToolJobs(): Promise<ToolJobsResponse> {
+  const response = await fetch(`${API_BASE}/tools/jobs`)
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to fetch maintenance jobs')
+  }
+  return response.json()
+}
+
+export async function getToolJob(id: string): Promise<ToolJob> {
+  const response = await fetch(`${API_BASE}/tools/jobs/${id}`)
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to fetch maintenance job')
+  }
+  return response.json()
+}
+
+export async function getToolJobLogs(id: string, tailBytes: number = 20000): Promise<string> {
+  const response = await fetch(`${API_BASE}/tools/jobs/${id}/logs?tail_bytes=${tailBytes}`)
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to fetch maintenance job logs')
+  }
+  return response.text()
+}
+
+export async function startToolJob(
+  jobType: string,
+  options?: {
+    apply?: boolean
+    args?: string[]
+    env?: Record<string, string>
+  },
+): Promise<{ status: string; job: ToolJob }> {
+  const response = await fetch(`${API_BASE}/tools/jobs/${jobType}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      apply: options?.apply ?? false,
+      args: options?.args ?? [],
+      env: options?.env ?? {},
+    }),
+  })
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to start maintenance job')
+  }
+  return response.json()
+}
+
+export async function cancelToolJob(id: string): Promise<{ status: string; job: ToolJob }> {
+  const response = await fetch(`${API_BASE}/tools/jobs/${id}/cancel`, {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to cancel maintenance job')
   }
   return response.json()
 }

@@ -106,3 +106,32 @@ export interface VideoDetection {
   bbox: number[]
   confidence: number
 }
+
+export interface ToolJobTypeInfo {
+  supports_apply: boolean
+  writes_without_apply: boolean
+  heavy: boolean
+}
+
+export type ToolJobStatus = 'queued' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled'
+
+export interface ToolJob {
+  id: string
+  type: string
+  status: ToolJobStatus
+  created_at: number
+  started_at: number | null
+  finished_at: number | null
+  progress: number | null
+  exit_code: number | null
+  command: string[]
+  dry_run: boolean
+  log_path: string
+  error: string | null
+  heavy: boolean
+}
+
+export interface ToolJobsResponse {
+  job_types: Record<string, ToolJobTypeInfo>
+  jobs: ToolJob[]
+}
