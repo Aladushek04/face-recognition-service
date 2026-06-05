@@ -55,3 +55,7 @@ releases/
 logs/
 config.json
 *.patch
+build/
+dist/
+data/
+test_win32.cs
