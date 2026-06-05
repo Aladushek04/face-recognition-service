@@ -35,6 +35,23 @@ export function getApiBaseUrl(): string {
   return API_BASE
 }
 
+export function resolveMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  
+  let normalizedUrl = url
+  if (normalizedUrl.startsWith('api/')) {
+    normalizedUrl = '/' + normalizedUrl
+  }
+  
+  if (normalizedUrl.startsWith('/api/')) {
+    const base = getApiBaseUrl()
+    return base.slice(0, -4) + normalizedUrl
+  }
+  
+  return url
+}
+
 async function responseError(response: Response, fallback: string): Promise<Error> {
   const contentType = response.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
@@ -599,4 +616,62 @@ export async function cancelToolJob(id: string): Promise<{ status: string; job: 
     throw await responseError(response, 'Failed to cancel maintenance job')
   }
   return response.json()
+}
+export interface DesktopConfig {
+  schemaVersion: number;
+  runtime: {
+    baseDir: string;
+    actorsDir: string;
+    modelsDir: string;
+    faissIndexDir: string;
+    videosDir: string;
+    jobsDir: string;
+    logsDir: string;
+  };
+  backend: {
+    host: string;
+    port: number;
+    desktopMode: boolean;
+    corsOrigins: string[];
+  };
+  ai: {
+    faceExecutionProviders: string[];
+    faceModelName: string;
+  };
+}
+
+export interface ValidationResponse {
+  status: 'ok' | 'warning' | 'error';
+  errors: string[];
+  warnings: string[];
+  restartRequired: boolean;
+}
+
+export async function getDesktopConfig(): Promise<DesktopConfig> {
+  const res = await fetch(`${API_BASE}/desktop/config`);
+  if (!res.ok) throw new Error('Failed to fetch desktop config');
+  return res.json();
+}
+
+export async function validateDesktopConfig(config: DesktopConfig): Promise<ValidationResponse> {
+  const res = await fetch(`${API_BASE}/desktop/config/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error('Failed to validate config');
+  return res.json();
+}
+
+export async function saveDesktopConfig(config: DesktopConfig): Promise<ValidationResponse> {
+  const res = await fetch(`${API_BASE}/desktop/config/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || 'Failed to save config');
+  }
+  return res.json();
 }

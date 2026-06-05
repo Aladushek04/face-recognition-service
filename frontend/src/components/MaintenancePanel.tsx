@@ -390,7 +390,7 @@ function SystemDiagnostics({
           <div className="min-w-0">
             <h3 className="text-title-large text-on-surface">Runtime Paths</h3>
             <p className="mt-1 text-xs text-on-surface-variant">
-              Read-only for Phase 2.5. Editing comes after the desktop shell contract is stable.
+              Runtime paths are loaded from config.json. Edit them in Settings.
             </p>
           </div>
         </div>

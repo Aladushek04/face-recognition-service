@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from routes import upload, actors, stashdb, videos, tools, system
+from routes import upload, actors, stashdb, videos, tools, system, desktop
 from database.schema import init_db
 
 _index_rebuild_state = {
@@ -51,6 +51,7 @@ app.include_router(stashdb.router)
 app.include_router(videos.router)
 app.include_router(tools.router)
 app.include_router(system.router)
+app.include_router(desktop.router)
 
 # Mount static files for icons
 icons_dir = Path(__file__).parent.parent / "data" / "icons"
@@ -58,27 +59,36 @@ if icons_dir.exists():
     app.mount("/api/icons", StaticFiles(directory=str(icons_dir)), name="icons")
 
 # Mount static files for thumbnails
-thumbnails_dir = Path(settings.base_dir) / "thumbnails"
-thumbnails_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/api/thumbnails", StaticFiles(directory=str(thumbnails_dir)), name="thumbnails")
+try:
+    thumbnails_dir = Path(settings.base_dir) / "thumbnails"
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/api/thumbnails", StaticFiles(directory=str(thumbnails_dir)), name="thumbnails")
+except Exception as e:
+    print(f"[Startup Warning] Could not create or mount thumbnails directory: {e}")
 
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and models on startup."""
-    # Initialize database
-    init_db()
-    from database.schema import get_db_path
-    reset_count = videos.reset_interrupted_processing_videos(get_db_path())
-    if reset_count:
-        print(f"[Startup] Reset {reset_count} interrupted video processing jobs")
+    try:
+        # Initialize database
+        init_db()
+        from database.schema import get_db_path
+        reset_count = videos.reset_interrupted_processing_videos(get_db_path())
+        if reset_count:
+            print(f"[Startup] Reset {reset_count} interrupted video processing jobs")
+    except Exception as e:
+        print(f"[Startup Warning] Could not initialize database: {e}")
 
     # Ensure directories exist
-    settings.actors_dir.mkdir(parents=True, exist_ok=True)
-    settings.faiss_index_dir.mkdir(parents=True, exist_ok=True)
-    (settings.base_dir / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-    (settings.base_dir / "models").mkdir(parents=True, exist_ok=True)
+    try:
+        settings.actors_dir.mkdir(parents=True, exist_ok=True)
+        settings.faiss_index_dir.mkdir(parents=True, exist_ok=True)
+        (settings.base_dir / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+        (settings.base_dir / "models").mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[Startup Warning] Could not create external directories: {e}")
 
     # Generate missing thumbnails in background thread
     import threading
@@ -105,17 +115,53 @@ async def health_check():
     from models.vector_store import VectorStore
     from database import actor_db
 
-    detector = FaceDetector()
+    errors = []
+    
+    # Check basic paths
+    if not settings.base_dir.exists():
+        errors.append(f"baseDir missing: {settings.base_dir}")
+    if not settings.actors_dir.exists():
+        errors.append(f"actorsDir missing: {settings.actors_dir}")
+    if not settings.faiss_index_dir.exists():
+        errors.append(f"faissIndexDir missing: {settings.faiss_index_dir}")
+    if not settings.faiss_index_path.exists():
+        errors.append(f"FAISS index file missing: {settings.faiss_index_path}")
+    
+    # Attempt DB read safely
+    actors_count = 0
+    try:
+        actors_count = actor_db.get_actors_count()
+    except Exception as e:
+        errors.append(f"Database unavailable: {e}")
+
+    try:
+        detector = FaceDetector()
+        model_loaded = detector.model_loaded
+    except Exception as e:
+        model_loaded = False
+        errors.append(f"Models unavailable: {e}")
+
     vector_store = VectorStore()
-    if not vector_store.is_loaded:
-        vector_store.load_index()
+    try:
+        if not vector_store.is_loaded:
+            vector_store.load_index()
+    except Exception as e:
+        errors.append(f"VectorStore error: {e}")
+
+    faiss_available = vector_store.is_loaded
+
+    if errors or actors_count == 0 or not faiss_available:
+        status = "config_required"
+    else:
+        status = "healthy"
 
     return {
-        "status": "healthy",
-        "actors_count": actor_db.get_actors_count(),
+        "status": status,
+        "actors_count": actors_count,
         "index_size": vector_store.index_size,
-        "faiss_available": True,
-        "model_loaded": detector.model_loaded,
+        "faiss_available": faiss_available,
+        "model_loaded": model_loaded,
+        "errors": errors
     }
 
 
@@ -162,7 +208,12 @@ def _run_index_rebuild(refresh_cache: bool) -> None:
         command.append("--refresh-cache")
 
     try:
-        result = subprocess.run(command, cwd=str(script_path.parent.parent), check=False)
+        import os
+        kwargs = {}
+        if os.name == "nt":
+            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            kwargs["creationflags"] = create_no_window
+        result = subprocess.run(command, cwd=str(script_path.parent.parent), check=False, **kwargs)
         message = "completed" if result.returncode == 0 else f"failed with exit code {result.returncode}"
         exit_code = result.returncode
     except Exception as exc:
@@ -199,6 +250,32 @@ async def rebuild_index(refresh_cache: bool = False):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--run-job":
+        job_name = sys.argv[2]
+        job_args = sys.argv[3:]
+        
+        ALLOWED_JOBS = {
+            "cleanup_actors": "jobs.cleanup_actors",
+            "cleanup_empty_actor_dirs": "jobs.cleanup_empty_actor_dirs",
+            "cleanup_images": "jobs.cleanup_images",
+            "repair_empty_actor_photos": "jobs.repair_empty_actor_photos",
+            "scrape_stashdb": "jobs.scrape_stashdb",
+            "build_index": "jobs.build_index",
+        }
+        
+        if job_name not in ALLOWED_JOBS:
+            print(f"ERROR: Unknown or unauthorized job '{job_name}'", file=sys.stderr)
+            sys.exit(1)
+            
+        import importlib
+        try:
+            module = importlib.import_module(ALLOWED_JOBS[job_name])
+            exit_code = module.main(job_args)
+            sys.exit(exit_code)
+        except Exception as e:
+            print(f"ERROR: Failed to run job '{job_name}': {e}", file=sys.stderr)
+            sys.exit(1)
+
     import uvicorn
     uvicorn.run(
         "main:app",

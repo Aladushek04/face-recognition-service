@@ -18,14 +18,6 @@ from pathlib import Path
 
 import numpy as np
 
-# Add parent directory to path.
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
 from models.face_detector import FaceDetector  # noqa: E402
@@ -36,7 +28,7 @@ DEFAULT_PAGE_SIZE = 1000
 DEFAULT_MIN_IMAGES = 4
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the face-recognition FAISS index.")
     parser.add_argument("--page-size", type=int, default=DEFAULT_PAGE_SIZE, help="Actor DB page size.")
     parser.add_argument(
@@ -61,7 +53,7 @@ def parse_args() -> argparse.Namespace:
         default=settings.base_dir / "data" / "embeddings",
         help="Directory for cached .npy embedding files.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def load_actor_image_groups(page_size: int) -> tuple[dict[int, dict], int, int]:
@@ -156,8 +148,8 @@ def get_image_embeddings(
     return embeddings
 
 
-def build_index() -> bool:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     page_size = max(args.page_size, 1)
     min_images = max(args.min_images, 1)
     cache_dir = args.cache_dir
@@ -173,7 +165,7 @@ def build_index() -> bool:
     if not detector.model_loaded:
         print("ERROR: Face detection model not loaded!")
         print("Please install insightface and onnxruntime/onnxruntime-gpu.")
-        return False
+        return 1
 
     vector_store = VectorStore()
     vector_store.create_index()
@@ -228,7 +220,7 @@ def build_index() -> bool:
 
     if total_actors == 0:
         print("No actors found in database. Run seed_actors.py or scrape_stashdb.py first.")
-        return False
+        return 1
 
     vector_store.save_index()
 
@@ -241,12 +233,12 @@ def build_index() -> bool:
     print(f"  Missing image files ignored: {missing_image_files}")
     print(f"  Total vectors: {total_vectors}")
     print(f"  Index saved to: {settings.faiss_index_path}")
-    return True
+    return 0
 
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(0 if build_index() else 1)
+        raise SystemExit(main())
     except KeyboardInterrupt:
         print("\nIndex build interrupted by user.")
         raise SystemExit(130)

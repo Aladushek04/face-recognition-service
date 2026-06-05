@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Upload, Users, Camera, Film, Wrench } from 'lucide-react'
+﻿import { useState, useEffect } from 'react'
+import { Upload, Users, Camera, Film, Wrench, Settings } from 'lucide-react'
 import { AppShell } from './components/AppShell'
 import { UploadZone } from './components/UploadZone'
 import { ResultsPanel } from './components/ResultsPanel'
 import { ActorsPanel } from './components/ActorsPanel'
 import { VideosPanel } from './components/VideosPanel'
 import { MaintenancePanel } from './components/MaintenancePanel'
+import { SettingsPanel } from './components/SettingsPanel'
 import { useAppStore } from './hooks/useStore'
 import { getHealth } from './lib/api'
 import { useUiPreferences } from './lib/useUiPreferences'
@@ -22,7 +23,33 @@ function App() {
   const clearResults = useAppStore((s) => s.clearResults)
 
   useEffect(() => {
-    getHealth().then(setHealth).catch(() => setHealth(null))
+    let timeoutId: number
+    let isSubscribed = true
+
+    const fetchHealth = async () => {
+      try {
+        const result = await getHealth()
+        if (isSubscribed) setHealth(result)
+
+        if (!isSubscribed) return
+
+        const isReady = result.model_loaded && result.actors_count > 0 && result.index_size > 0
+        const delay = isReady ? 30000 : 3000
+        timeoutId = window.setTimeout(fetchHealth, delay)
+      } catch (err) {
+        if (isSubscribed) {
+          setHealth((prev) => prev)
+          timeoutId = window.setTimeout(fetchHealth, 3000)
+        }
+      }
+    }
+
+    fetchHealth()
+
+    return () => {
+      isSubscribed = false
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
   }, [])
 
   const handleResults = (results: UploadResponse[]) => {
@@ -44,6 +71,7 @@ function App() {
     { id: 'actors' as const, label: language === 'ru' ? 'База' : 'Actors', icon: Users },
     { id: 'videos' as const, label: language === 'ru' ? 'Видео' : 'Videos', icon: Film },
     { id: 'maintenance' as const, label: language === 'ru' ? 'Сервис' : 'Tools', icon: Wrench },
+    { id: 'settings' as const, label: language === 'ru' ? 'Настройки' : 'Settings', icon: Settings },
   ]
 
   return (
@@ -78,26 +106,53 @@ function App() {
             )}
           </div>
         </section>
-      )}
-
-      {activeView === 'actors' && (
-        <section className="md-card p-5 lg:p-6">
-          <ActorsPanel onAddActor={() => {}} />
-        </section>
-      )}
-
-      {activeView === 'videos' && (
-        <section className="md-card p-5 lg:p-6">
-          <VideosPanel />
-        </section>
+      )}      {activeView === 'actors' && (
+        health?.status === 'config_required' ? (
+          <ConfigRequiredMessage />
+        ) : (
+          <section className="md-card p-5 lg:p-6">
+            <ActorsPanel onAddActor={() => {}} />
+          </section>
+        )
+      )}      {activeView === 'videos' && (
+        health?.status === 'config_required' ? (
+          <ConfigRequiredMessage />
+        ) : (
+          <section className="md-card p-5 lg:p-6">
+            <VideosPanel />
+          </section>
+        )
       )}
       {activeView === 'maintenance' && (
         <section className="md-card p-5 lg:p-6">
           <MaintenancePanel />
         </section>
       )}
+      {activeView === 'settings' && (
+        <section className="md-card p-5 lg:p-6">
+          <SettingsPanel />
+        </section>
+      )}
     </AppShell>
   )
 }
 
+function ConfigRequiredMessage() {
+  const { language } = useUiPreferences()
+  return (
+    <div className="md-card flex min-h-[400px] flex-col items-center justify-center p-8 text-center">
+      <div className="mb-4 rounded-full bg-error-container p-4 text-on-error-container">
+        <Wrench size={48} />
+      </div>
+      <h2 className="text-headline-medium text-on-surface mb-2">
+        {language === 'ru' ? 'Требуется настройка' : 'Configuration Required'}
+      </h2>
+      <p className="text-body-large text-on-surface-variant max-w-md">
+        {language === 'ru' ? 'Данные среды выполнения не настроены. Откройте «Настройки» и укажите пути FaceService.' : 'Runtime data is not configured. Open Settings and set your FaceService paths.'}
+      </p>
+    </div>
+  )
+}
+
 export default App
+

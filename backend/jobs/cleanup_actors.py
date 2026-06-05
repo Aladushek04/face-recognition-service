@@ -15,16 +15,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
-from country_filters import (  # noqa: E402
+from jobs.country_filters import (  # noqa: E402
     COUNTRY_REGION_FILTERS,
     allowed_countries_for_region,
     normalize_country,
@@ -40,7 +33,7 @@ BREAST_TYPES = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Delete actors/folders that fail metadata filters.")
     parser.add_argument("--gender", choices=["female", "male", "other"], help="Required local gender.")
     parser.add_argument("--breast-type", choices=sorted(BREAST_TYPES), help="Required breast type.")
@@ -78,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--apply", action="store_true", help="Actually delete rows/folders. Default is dry-run.")
     parser.add_argument("--page-size", type=int, default=1000)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def iter_actors(page_size: int):
@@ -193,8 +186,8 @@ def delete_actor_folder(path: Path) -> None:
         shutil.rmtree(path)
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     args.allowed_countries = allowed_countries_for_region(args.country_region) | parse_country_list(args.include_countries)
     args.excluded_countries = parse_country_list(args.exclude_countries)
     candidates: list[tuple[dict[str, Any], str]] = []

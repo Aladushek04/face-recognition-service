@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "baseDir": "D:\\FaceService",
+    "actorsDir": "D:\\FaceService\\actors",
+    "modelsDir": "D:\\FaceService\\models",
+    "faissIndexDir": "D:\\FaceService\\data\\faiss_index",
+    "videosDir": "D:\\Videos",
+    "jobsDir": "D:\\FaceService\\data\\jobs",
+    "logsDir": "D:\\FaceService\\logs"
+  },
+  "backend": {
+    "host": "127.0.0.1",
+    "port": 0,
+    "desktopMode": true,
+    "corsOrigins": [
+      "https://app.face.local",
+      "http://127.0.0.1:3000",
+      "http://localhost:3000"
+    ]
+  },
+  "ai": {
+    "faceExecutionProviders": [
+      "CUDAExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "faceModelName": "buffalo_l"
+  }
+}

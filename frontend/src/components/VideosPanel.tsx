@@ -34,6 +34,7 @@ import {
   linkStashdbByUrl,
   addActorToVideo,
   removeActorFromVideo,
+  resolveMediaUrl,
 } from '../lib/api'
 import { useUiPreferences } from '../lib/useUiPreferences'
 import type { Video, Actor } from '../types'
@@ -1167,7 +1168,7 @@ function VideoPlayerModal({
               <div className="relative aspect-video rounded-2xl bg-surface-container-lowest overflow-hidden border border-outline-variant shadow-inner flex items-center justify-center">
                 <video
                   ref={videoRef}
-                  src={`/api/videos/${video.id}/stream`}
+                  src={resolveMediaUrl(`/api/videos/${video.id}/stream`) || `/api/videos/${video.id}/stream`}
                   controls
                   className="w-full h-full"
                   style={videoStyle}
@@ -1859,7 +1860,8 @@ function formatSize(bytes: number | null): string {
 }
 
 function videoThumbnailSrc(video: Video): string {
-  return `${video.thumbnail_url ?? `/api/thumbnails/${video.id}.jpg`}?t=${new Date(video.updated_at).getTime()}`
+  const url = `${video.thumbnail_url ?? `/api/thumbnails/${video.id}.jpg`}?t=${new Date(video.updated_at).getTime()}`
+  return resolveMediaUrl(url) || url
 }
 
 function normalizePersonName(name: string): string {

@@ -24,9 +24,8 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
-sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -72,7 +71,7 @@ query QueryPerformers($input: PerformerQueryInput!) {
 """
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Repair/delete actors with no local reference photos.")
     parser.add_argument("--apply", action="store_true", help="Actually write files/delete actors. Default is dry-run.")
     parser.add_argument("--action", choices=["delete", "repair"], help="Skip the interactive 1/2 prompt.")
@@ -100,7 +99,7 @@ def parse_args() -> argparse.Namespace:
         default="",
         help='Extra build_index.py args, for example "--min-images 4".',
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def safe_actor_dir_name(name: str) -> str:
@@ -329,8 +328,8 @@ def rebuild_index(args: argparse.Namespace) -> int:
     return subprocess.run(command, cwd=PROJECT_ROOT, check=False).returncode
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     candidates = empty_photo_actors(max(args.page_size, 1), args.limit)
 
     print(f"Actors with no local reference photos: {len(candidates)}")

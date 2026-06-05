@@ -77,6 +77,7 @@ export interface HealthStatus {
   index_size: number
   faiss_available: boolean
   model_loaded: boolean
+  errors?: string[]
 }
 
 export interface Video {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Activity, Camera, Database, Eye, EyeOff, Moon, Sun } from 'lucide-react'
 import { useUiPreferences } from '../lib/useUiPreferences'
@@ -131,8 +131,15 @@ export function AppShell({
 
 function HealthPills({ health }: { health: HealthStatus | null }) {
   const { language, t } = useUiPreferences()
-  const modelReady = Boolean(health?.model_loaded)
-  const modelLabel = modelReady ? t('modelReady') : language === 'ru' ? 'Модель не готова' : 'Model Unready'
+  const configRequired = health?.status === 'config_required'
+  const modelReady = Boolean(health?.model_loaded) && !configRequired
+  let modelLabel = ''
+  if (configRequired) {
+    modelLabel = language === 'ru' ? 'Требуется настройка' : 'Configuration Required'
+  } else {
+    modelLabel = modelReady ? t('modelReady') : language === 'ru' ? 'Модель не готова' : 'Model Unready'
+  }
+  const statusColor = configRequired ? 'var(--md-sys-color-error)' : modelReady ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-error)'
 
   return (
     <>
@@ -140,8 +147,8 @@ function HealthPills({ health }: { health: HealthStatus | null }) {
         <div
           className="h-2.5 w-2.5 rounded-full shadow-[0_0_0_3px_color-mix(in_srgb,currentColor_18%,transparent)]"
           style={{
-            backgroundColor: modelReady ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-error)',
-            color: modelReady ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-error)',
+            backgroundColor: statusColor,
+            color: statusColor,
           }}
           aria-hidden="true"
         />
@@ -257,3 +264,4 @@ function BottomNavigation({
     </nav>
   )
 }
+

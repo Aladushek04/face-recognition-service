@@ -11,10 +11,14 @@ Optional:
 from __future__ import annotations
 
 import argparse
+import base64
+import itertools
 import os
 import re
+import shutil
 import sqlite3
 import sys
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -23,15 +27,8 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-# Add the project root to the path so we can import backend modules.
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
-sys.path.insert(0, str(PROJECT_ROOT / "backend"))
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
@@ -350,7 +347,7 @@ class StashDBError(RuntimeError):
     """Raised when StashDB returns an HTTP or GraphQL error."""
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Import performers from StashDB into data/db/actors.db.",
     )
@@ -448,7 +445,7 @@ def parse_args() -> argparse.Namespace:
         help="Update StashDB metadata for existing performers instead of only skipping them.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Fetch and print candidates without writing DB/files.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def headers() -> dict[str, str]:
@@ -1022,10 +1019,14 @@ def import_performer(
     return True
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     limit = None if args.all else max(args.limit, 1)
     page_size = min(max(args.page_size, 1), 100)
+    from jobs.country_filters import (  # noqa: E402
+        allowed_countries_for_region,
+        parse_country_list,
+    )
     allowed_countries = allowed_countries_for_region(args.country_region) | parse_country_list(args.include_countries)
     excluded_countries = parse_country_list(args.exclude_countries)
     imported = 0

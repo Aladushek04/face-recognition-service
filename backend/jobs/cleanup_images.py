@@ -6,21 +6,13 @@ Dry-run is the default. Use --apply to delete files and DB rows.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from database import actor_db  # noqa: E402
 from models.face_detector import FaceDetector  # noqa: E402
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Delete actor reference images without usable faces.")
     parser.add_argument("--apply", action="store_true", help="Actually delete files and DB rows. Default is dry-run.")
     parser.add_argument("--page-size", type=int, default=500, help="DB page size.")
@@ -36,7 +28,7 @@ def parse_args() -> argparse.Namespace:
         default=0.01,
         help="Minimum detected face bbox area relative to image area.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def iter_images(page_size: int):
@@ -73,8 +65,8 @@ def has_usable_face(detector: FaceDetector, image_path: Path, min_face_area_rati
     return False
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     checked = 0
     kept = 0
     candidates: list[tuple[dict, str]] = []

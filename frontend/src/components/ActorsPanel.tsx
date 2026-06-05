@@ -25,6 +25,7 @@ import {
   addActorImage,
   searchStashdb,
   importStashdbPerformer,
+  resolveMediaUrl,
 } from '../lib/api'
 import { useAppStore } from '../hooks/useStore'
 import { useUiPreferences } from '../lib/useUiPreferences'
@@ -443,7 +444,7 @@ export function ActorsPanel({ onAddActor }: ActorsPanelProps) {
                           <div className="flex items-start gap-4">
                             <div className="h-24 w-18 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container shadow-sm">
                               {p.image_url ? (
-                                <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
+                                <img src={resolveMediaUrl(p.image_url)} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center font-bold text-base text-on-surface-variant">
                                   {initials}
@@ -799,7 +800,7 @@ function ActorCard({
         <div className={`relative h-24 w-20 flex-shrink-0 overflow-hidden rounded-2xl shadow-sm ${genderColor}`}>
           {actor.preview_image_url ? (
             <img
-              src={actor.preview_image_url}
+              src={resolveMediaUrl(actor.preview_image_url)}
               alt={actor.name}
               className="h-full w-full object-cover"
               loading="lazy"
@@ -972,7 +973,7 @@ function ActorDetailModal({
               <div className="flex h-[520px] items-center justify-center" data-private-media-container="true">
                 {selectedImage ? (
                   <img
-                    src={selectedImage.url}
+                    src={resolveMediaUrl(selectedImage.url)}
                     alt={`${actor.name} reference ${selectedImageIndex + 1}`}
                     className="h-full w-full object-contain"
                     data-private-media="true"
@@ -1002,7 +1003,7 @@ function ActorDetailModal({
                         data-private-media-container="true"
                       >
                         <img
-                          src={image.url}
+                          src={resolveMediaUrl(image.url)}
                           alt={image.filename}
                           className="h-full w-full object-cover"
                           loading="lazy"
@@ -1069,7 +1070,7 @@ function ActorDetailModal({
                               alt=""
                               className="w-4 h-4 object-contain flex-shrink-0"
                               onError={(e) => {
-                                e.currentTarget.src = '/api/icons/no_icon.png'
+                                e.currentTarget.src = resolveMediaUrl('/api/icons/no_icon.png') || '/api/icons/no_icon.png'
                               }}
                             />
                           ) : (

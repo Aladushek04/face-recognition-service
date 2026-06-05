@@ -32,18 +32,18 @@ class JobDefinition:
 
 JOB_DEFINITIONS: dict[str, JobDefinition] = {
     "build_index": JobDefinition(
-        "scripts/build_index.py",
+        "build_index",
         supports_apply=False,
         writes_without_apply=True,
     ),
     "repair_empty_actor_photos": JobDefinition(
-        "scripts/repair_empty_actor_photos.py",
+        "repair_empty_actor_photos",
         default_args=("--action", "repair"),
     ),
-    "cleanup_actors": JobDefinition("scripts/cleanup_actors.py"),
-    "cleanup_empty_actor_dirs": JobDefinition("scripts/cleanup_empty_actor_dirs.py"),
-    "cleanup_images": JobDefinition("scripts/cleanup_images.py"),
-    "scrape_stashdb": JobDefinition("scripts/scrape_stashdb.py", dry_run_args=("--dry-run",)),
+    "cleanup_actors": JobDefinition("cleanup_actors"),
+    "cleanup_empty_actor_dirs": JobDefinition("cleanup_empty_actor_dirs"),
+    "cleanup_images": JobDefinition("cleanup_images"),
+    "scrape_stashdb": JobDefinition("scrape_stashdb", dry_run_args=("--dry-run",)),
 }
 
 
@@ -157,8 +157,15 @@ class JobManager:
             return job
 
     def _build_command(self, definition: JobDefinition, apply: bool, args: list[str]) -> list[str]:
-        script_path = PROJECT_ROOT / definition.script
-        command = [sys.executable, str(script_path), *definition.default_args]
+        job_name = definition.script
+        if getattr(sys, "frozen", False):
+            command = [sys.executable, "--run-job", job_name, *definition.default_args]
+        else:
+            main_script = PROJECT_ROOT / "backend/backend_main.py"
+            # Fallback to backend/main.py if backend_main.py doesn't exist (e.g. very old dev)
+            if not main_script.exists():
+                main_script = PROJECT_ROOT / "backend/main.py"
+            command = [sys.executable, str(main_script), "--run-job", job_name, *definition.default_args]
         if apply and definition.supports_apply and "--apply" not in args:
             command.append("--apply")
         if not apply:
@@ -197,6 +204,11 @@ class JobManager:
             with open(log_path, "w", encoding="utf-8", errors="replace") as log_file:
                 log_file.write(f"$ {' '.join(command)}\n\n")
                 log_file.flush()
+                creation_flags = 0
+                if os.name == "nt":
+                    create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                    creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | create_no_window
+
                 process = subprocess.Popen(
                     command,
                     cwd=str(PROJECT_ROOT),
@@ -205,7 +217,7 @@ class JobManager:
                     stdin=subprocess.DEVNULL,
                     text=True,
                     env=env,
-                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+                    creationflags=creation_flags,
                 )
                 with self._lock:
                     self._processes[job_id] = process
@@ -235,7 +247,18 @@ class JobManager:
         finally:
             with self._lock:
                 self._processes.pop(job_id, None)
-
+                
+            job = self.get_job(job_id)
+            if job and job.get("status") == "completed" and job["name"] == "build_index":
+                try:
+                    from routes.actors import get_vector_store as a_vs
+                    from routes.stashdb import get_vector_store as s_vs
+                    from routes.upload import get_vector_store as u_vs
+                    a_vs().load_index()
+                    s_vs().load_index()
+                    u_vs().load_index()
+                except Exception as exc:
+                    print(f"Failed to reload vector stores after build_index: {exc}")
     def _has_running_heavy_job(self) -> bool:
         for job in self.list_jobs():
             if job.get("heavy") and job.get("status") in {"queued", "running", "cancelling"}:

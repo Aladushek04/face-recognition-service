@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import type { FaceMatch, UploadResponse, Actor } from '../types'
 import { X, Clock, User, AlertCircle, ImageOff, Copy, Check, UserPlus, Loader2 } from 'lucide-react'
 import { useUiPreferences } from '../lib/useUiPreferences'
-import { assignFace, getActors } from '../lib/api'
+import { assignFace, getActors, resolveMediaUrl } from '../lib/api'
 
 interface ResultsPanelProps {
   results: UploadResponse[]
@@ -168,7 +168,7 @@ function ResultCard({ result }: { result: UploadResponse }) {
     }
   }
 
-  const uploadedImageUrl = `/api/uploads/${result.image_id}`
+  const uploadedImageUrl = resolveMediaUrl(`/api/uploads/${result.image_id}`) || `/api/uploads/${result.image_id}`
 
   return (
     <div className="md-card overflow-hidden">
@@ -298,7 +298,7 @@ function ResultCard({ result }: { result: UploadResponse }) {
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 overflow-hidden rounded-2xl bg-surface-container border border-outline-variant flex-shrink-0">
                     {selectedFace.bestMatch.actor_image_url ? (
-                      <img src={selectedFace.bestMatch.actor_image_url} alt={selectedFace.bestMatch.actor_name} className="h-full w-full object-cover" />
+                      <img src={resolveMediaUrl(selectedFace.bestMatch.actor_image_url)} alt={selectedFace.bestMatch.actor_name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center font-bold text-lg">{selectedFace.bestMatch.actor_name[0]}</div>
                     )}
@@ -371,7 +371,7 @@ function ResultCard({ result }: { result: UploadResponse }) {
                 <div className="flex flex-col items-center gap-2">
                   <div className="h-[150px] w-[150px] overflow-hidden rounded-2xl bg-surface-container border border-outline-variant shadow-sm">
                     {selectedFace.bestMatch?.actor_image_url ? (
-                      <img src={selectedFace.bestMatch.actor_image_url} alt="db ref" className="h-full w-full object-cover" />
+                      <img src={resolveMediaUrl(selectedFace.bestMatch.actor_image_url)} alt="db ref" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-on-surface-variant"><ImageOff size={32} /></div>
                     )}
@@ -393,7 +393,7 @@ function ResultCard({ result }: { result: UploadResponse }) {
                   {selectedFace.closeMatches.slice(0, 3).map((match) => (
                     <div key={match.actor_id} className="flex items-center gap-2 p-2 rounded-xl bg-surface-container-lowest text-xs border border-outline-variant/30">
                       <div className="h-8 w-8 overflow-hidden rounded-lg bg-surface-container flex-shrink-0">
-                        {match.actor_image_url && <img src={match.actor_image_url} alt={match.actor_name} className="h-full w-full object-cover" />}
+                        {match.actor_image_url && <img src={resolveMediaUrl(match.actor_image_url)} alt={match.actor_name} className="h-full w-full object-cover" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-on-surface truncate">{match.actor_name}</p>
@@ -589,7 +589,7 @@ function AssignModal({ imageId, uploadedImageUrl, bbox, onClose, onSuccess }: As
                       }`}
                     >
                       <div className="h-8 w-8 overflow-hidden rounded-lg bg-surface-container flex-shrink-0">
-                        {actor.preview_image_url && <img src={actor.preview_image_url} alt="" className="h-full w-full object-cover" />}
+                        {actor.preview_image_url && <img src={resolveMediaUrl(actor.preview_image_url)} alt="" className="h-full w-full object-cover" />}
                       </div>
                       <span className="flex-1 truncate">{actor.name}</span>
                       {actor.birth_year && <span className="text-xs text-on-surface-variant">({actor.birth_year})</span>}

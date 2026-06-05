@@ -15,20 +15,13 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 from config import settings  # noqa: E402
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Delete empty actor folders from the local actors directory.",
     )
@@ -48,7 +41,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Actually delete folders. Default is dry-run.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def resolve_safe_actors_dir(path: Path) -> Path:
@@ -94,8 +87,8 @@ def collect_delete_candidates(actors_dir: Path, without_images: bool) -> list[Pa
     )
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     actors_dir = resolve_safe_actors_dir(args.actors_dir)
     candidates = collect_delete_candidates(actors_dir, args.without_images)
 

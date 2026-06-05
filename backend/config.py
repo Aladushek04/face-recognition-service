@@ -1,8 +1,19 @@
 """Application configuration."""
 
+import sys
 from pydantic_settings import BaseSettings
 from pydantic import model_validator
 from pathlib import Path
+
+def get_base_dir() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+def get_env_file() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).resolve().parent / ".env"
+    return Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -15,7 +26,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # Paths
-    base_dir: Path = Path(__file__).resolve().parent.parent
+    base_dir: Path = get_base_dir()
     actors_dir: Path | None = None
     faiss_index_dir: Path | None = None
     videos_dir: Path = Path("D:/Videos")
@@ -49,7 +60,7 @@ class Settings(BaseSettings):
     faiss_candidate_multiplier: int = 20
     max_faces_per_image: int = 10
     embedding_dim: int = 512
-    face_execution_providers: list[str] = ["CPUExecutionProvider"]
+    face_execution_providers: list[str] = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     video_frame_step: float = 1.0
     video_face_recognition_threshold: float = 0.55
     video_face_strong_match_threshold: float = 0.68
@@ -76,7 +87,7 @@ class Settings(BaseSettings):
     stashdb_api_key: str = ""
 
     class Config:
-        env_file = Path(__file__).parent.parent / ".env"
+        env_file = get_env_file()
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"

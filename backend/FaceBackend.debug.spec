@@ -1,0 +1,110 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+import os
+import glob
+
+# Resolve DLLs
+site_packages = r'C:\Users\isoko\AppData\Local\Programs\Python\Python310\lib\site-packages'
+required_dlls = [
+    'cudnn64_9.dll',
+    'cudnn_engines_runtime_compiled64_9.dll',
+    'cudnn_engines_precompiled64_9.dll',
+    'cudnn_ops64_9.dll',
+    'cudnn_cnn64_9.dll',
+    'cudnn_adv64_9.dll',
+    'cudnn_graph64_9.dll',
+    'cudnn_heuristic64_9.dll',
+    'onnxruntime_providers_cuda.dll',
+    'onnxruntime_providers_shared.dll',
+    'cublas64_12.dll',
+    'cublasLt64_12.dll',
+    'cudart64_12.dll',
+]
+
+extra_binaries = []
+all_nvidia_dlls = glob.glob(os.path.join(site_packages, 'nvidia', '**', 'bin', '*.dll'), recursive=True)
+all_onnx_dlls = glob.glob(os.path.join(site_packages, 'onnxruntime', 'capi', '*.dll'))
+all_dlls = all_nvidia_dlls + all_onnx_dlls
+
+for dll in all_dlls:
+    if os.path.basename(dll) in required_dlls:
+        extra_binaries.append((dll, '.'))
+
+block_cipher = None
+
+hidden_imports = [
+    'uvicorn.logging',
+    'uvicorn.loops',
+    'uvicorn.loops.auto',
+    'uvicorn.protocols',
+    'uvicorn.protocols.http',
+    'uvicorn.protocols.http.auto',
+    'uvicorn.protocols.websockets',
+    'uvicorn.protocols.websockets.auto',
+    'uvicorn.lifespan',
+    'uvicorn.lifespan.on',
+    'pydantic_settings',
+    'insightface',
+    'passlib.handlers.bcrypt',
+    'jobs.cleanup_actors',
+    'jobs.cleanup_empty_actor_dirs',
+    'jobs.cleanup_images',
+    'jobs.repair_empty_actor_photos',
+    'jobs.scrape_stashdb',
+    'jobs.build_index',
+    'insightface.app',
+    'insightface.model_zoo',
+    'faiss',
+    'cv2',
+    'PIL',
+    'numpy',
+    'sqlite3',
+    'fastapi'
+]
+
+a = Analysis(
+    ['backend_main.py'],
+    pathex=['.'],
+    binaries=extra_binaries,
+    datas=[],
+    hiddenimports=hidden_imports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='FaceBackendDebug',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True, # DEBUG CONSOLE ENABLED
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='FaceBackendDebug',
+)
