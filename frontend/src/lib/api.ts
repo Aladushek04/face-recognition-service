@@ -19,7 +19,9 @@ declare global {
 }
 
 function resolveApiBase(): string {
+  const params = new URLSearchParams(window.location.search)
   const configured =
+    params.get('apiBaseUrl') ||
     window.__FACE_SERVICE_CONFIG__?.apiBaseUrl ||
     import.meta.env.VITE_API_BASE_URL ||
     '/api'

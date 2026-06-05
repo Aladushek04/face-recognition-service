@@ -1,0 +1,11 @@
+{
+  "name": "face-recognition-service",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "desktop:dev": "npm --prefix desktop/electron run dev",
+    "desktop:start": "npm --prefix desktop/electron run start",
+    "desktop:install": "npm --prefix desktop/electron install",
+    "frontend:build": "npm --prefix frontend run build"
+  }
+}

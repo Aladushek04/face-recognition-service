@@ -1,0 +1,14 @@
+{
+  "name": "face-recognition-service-electron",
+  "private": true,
+  "version": "0.1.0",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron . --dev",
+    "start": "electron .",
+    "smoke": "electron . --smoke-test"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}
