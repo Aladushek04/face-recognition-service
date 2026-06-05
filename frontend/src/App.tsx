@@ -107,7 +107,7 @@ function App() {
           </div>
         </section>
       )}      {activeView === 'actors' && (
-        health?.status === 'config_required' ? (
+        (!health || health.status === 'config_required') ? (
           <ConfigRequiredMessage />
         ) : (
           <section className="md-card p-5 lg:p-6">
@@ -115,7 +115,7 @@ function App() {
           </section>
         )
       )}      {activeView === 'videos' && (
-        health?.status === 'config_required' ? (
+        (!health || health.status === 'config_required') ? (
           <ConfigRequiredMessage />
         ) : (
           <section className="md-card p-5 lg:p-6">
@@ -155,4 +155,5 @@ function ConfigRequiredMessage() {
 }
 
 export default App
+
 

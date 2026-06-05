@@ -4,7 +4,7 @@ import { Activity, Camera, Database, Eye, EyeOff, Moon, Sun } from 'lucide-react
 import { useUiPreferences } from '../lib/useUiPreferences'
 import type { HealthStatus } from '../types'
 
-export type AppView = 'upload' | 'actors' | 'videos' | 'maintenance'
+export type AppView = 'upload' | 'actors' | 'videos' | 'maintenance' | 'settings'
 
 export interface AppNavItem {
   id: AppView
@@ -264,4 +264,5 @@ function BottomNavigation({
     </nav>
   )
 }
+
 
