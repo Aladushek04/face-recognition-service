@@ -6,6 +6,7 @@
     "desktop:dev": "npm --prefix desktop/electron run dev",
     "desktop:start": "npm --prefix desktop/electron run start",
     "desktop:install": "npm --prefix desktop/electron install",
+    "desktop:build": "npm run frontend:build && npm --prefix desktop/electron run dist:portable",
     "frontend:build": "npm --prefix frontend run build"
   }
 }

@@ -28,6 +28,34 @@ npm --prefix desktop/electron run smoke
 Smoke mode opens the built `frontend/dist/index.html`, starts the backend,
 waits for `/api/health`, and exits automatically.
 
+## Portable Build
+
+Build a first portable Windows package:
+
+```powershell
+npm run desktop:build
+```
+
+Output:
+
+```text
+desktop/electron/dist/
+  FaceRecognitionService-0.1.0-portable-x64.exe
+  win-unpacked/
+```
+
+The portable build includes:
+
+- Electron shell.
+- Built React frontend from `frontend/dist`.
+- Backend Python source from `backend`.
+- Project scripts from `scripts`.
+- Small static icons from `data/icons`.
+
+The portable build does not bundle Python yet. The target machine still needs a
+working Python environment with backend dependencies installed, or
+`FACE_SERVICE_PYTHON` must point to the intended Python executable.
+
 ## Runtime Data
 
 The desktop shell does not package actor databases, videos, FAISS indexes,

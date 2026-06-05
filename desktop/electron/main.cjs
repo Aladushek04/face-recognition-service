@@ -6,11 +6,13 @@ const net = require('net')
 const path = require('path')
 const { pathToFileURL } = require('url')
 
-const ROOT_DIR = path.resolve(__dirname, '..', '..')
-const BACKEND_DIR = path.join(ROOT_DIR, 'backend')
-const FRONTEND_DIR = path.join(ROOT_DIR, 'frontend')
-const FRONTEND_DIST = path.join(FRONTEND_DIR, 'dist', 'index.html')
-const LOG_DIR = path.join(ROOT_DIR, 'logs')
+const isPackaged = app.isPackaged
+const ROOT_DIR = isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', '..')
+const BACKEND_DIR = isPackaged ? path.join(process.resourcesPath, 'backend') : path.join(ROOT_DIR, 'backend')
+const FRONTEND_DIST = isPackaged
+  ? path.join(process.resourcesPath, 'frontend', 'index.html')
+  : path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
+const LOG_DIR = isPackaged ? path.join(app.getPath('userData'), 'logs') : path.join(ROOT_DIR, 'logs')
 const isDev = process.argv.includes('--dev') || process.env.ELECTRON_DEV === '1'
 const isSmokeTest = process.argv.includes('--smoke-test')
 
