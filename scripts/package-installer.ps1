@@ -13,10 +13,20 @@ if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 }
 
-# 1. Build Desktop publish output if not skipped
+# 1. Build Backend
+if (-not $NoBuild) {
+    Write-Host "Running build-backend.ps1 to package the Python backend..."
+    & "$PSScriptRoot\build-backend.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "build-backend.ps1 failed."
+        exit $LASTEXITCODE
+    }
+}
+
+# 2. Build Desktop publish output if not skipped
 if (-not $NoBuild) {
     Write-Host "Running publish-desktop.ps1 to prepare the files..."
-    & "$PSScriptRoot\publish-desktop.ps1"
+    & "$RepoRoot\desktop\wpf\FaceRecognition.Desktop\scripts\publish-desktop.ps1" -IncludeBackend
     if ($LASTEXITCODE -ne 0) {
         Write-Error "publish-desktop.ps1 failed."
         exit $LASTEXITCODE
