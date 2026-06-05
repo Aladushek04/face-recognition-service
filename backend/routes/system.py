@@ -43,13 +43,33 @@ def _count_files(path: Path, patterns: tuple[str, ...]) -> int:
 @router.get("/status")
 def system_status() -> dict[str, Any]:
     """Return desktop-readiness diagnostics without mutating runtime state."""
-    from models.face_detector import FaceDetector
-    from models.vector_store import VectorStore
+    model_loaded = False
+    try:
+        from models.face_detector import FaceDetector
+        detector = FaceDetector()
+        model_loaded = detector.model_loaded
+    except Exception:
+        pass
 
-    detector = FaceDetector()
-    vector_store = VectorStore()
-    if not vector_store.is_loaded:
-        vector_store.load_index()
+    faiss_available = False
+    index_size = 0
+    try:
+        from models.vector_store import VectorStore
+        vector_store = VectorStore()
+        if not vector_store.is_loaded:
+            vector_store.load_index()
+        faiss_available = vector_store.is_loaded
+        index_size = vector_store.index_size
+    except Exception:
+        pass
+
+    actor_count = 0
+    actor_images_count = 0
+    try:
+        actor_count = actor_db.get_actors_count()
+        actor_images_count = actor_db.get_actor_images_count()
+    except Exception:
+        pass
 
     models_dir = settings.base_dir / "models"
     jobs_dir = settings.base_dir / "data" / "jobs"
@@ -83,15 +103,15 @@ def system_status() -> dict[str, Any]:
         {
             "id": "model",
             "label": "Face model",
-            "status": "ok" if detector.model_loaded else "error",
-            "message": "InsightFace model is loaded." if detector.model_loaded else "InsightFace model is not loaded.",
+            "status": "ok" if model_loaded else "error",
+            "message": "InsightFace model is loaded." if model_loaded else "InsightFace model is not loaded.",
         },
         {
             "id": "faiss",
             "label": "FAISS index",
-            "status": "ok" if paths["faiss_index"]["exists"] and vector_store.index_size > 0 else "warning",
+            "status": "ok" if paths["faiss_index"]["exists"] and index_size > 0 else "warning",
             "message": (
-                f"Index contains {vector_store.index_size} vectors."
+                f"Index contains {index_size} vectors."
                 if paths["faiss_index"]["exists"]
                 else "Index file is missing. Build the FAISS index before recognition."
             ),
@@ -99,8 +119,8 @@ def system_status() -> dict[str, Any]:
         {
             "id": "actors",
             "label": "Actor database",
-            "status": "ok" if actor_db.get_actors_count() > 0 else "warning",
-            "message": f"{actor_db.get_actors_count()} actors are available.",
+            "status": "ok" if actor_count > 0 else "warning",
+            "message": f"{actor_count} actors are available.",
         },
         {
             "id": "videos",
@@ -142,15 +162,15 @@ def system_status() -> dict[str, Any]:
         },
         "features": {
             "stashdb_configured": bool(settings.stashdb_api_key),
-            "model_loaded": detector.model_loaded,
-            "faiss_available": True,
+            "model_loaded": model_loaded,
+            "faiss_available": faiss_available,
             "browser_mode_supported": True,
             "desktop_mode_supported": True,
         },
         "counts": {
-            "actors": actor_db.get_actors_count(),
-            "actor_images": actor_db.get_actor_images_count(),
-            "faiss_vectors": vector_store.index_size,
+            "actors": actor_count,
+            "actor_images": actor_images_count,
+            "faiss_vectors": index_size,
             "model_files": _count_files(models_dir, ("*.onnx", "*.param", "*.bin")),
         },
         "paths": paths,
