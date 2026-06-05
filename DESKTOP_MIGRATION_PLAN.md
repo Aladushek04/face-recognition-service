@@ -1,8 +1,11 @@
 # Desktop Migration Plan
 
 This document is the working plan for moving the project from a local browser
-app to a stable desktop application. It is intentionally staged: reliability
-comes before packaging, and packaging comes before replacing the desktop shell.
+app to a stable desktop application. The target is not just a script launcher:
+the desktop app should contain the full service experience so the user does not
+need to manage browser tabs, terminal windows, backend processes, or manual
+startup order. It is intentionally staged: reliability comes before packaging,
+and packaging comes before replacing the desktop shell.
 
 ## Current Direction
 
@@ -18,7 +21,7 @@ Desktop shell
   -> starts Python backend
   -> waits for /api/health
   -> opens the React UI
-  -> exposes logs, paths, and app lifecycle controls
+  -> exposes logs, paths, diagnostics, and app lifecycle controls
 ```
 
 Short-term shell: Electron.
@@ -29,6 +32,7 @@ Possible later shell: WebView2 with WinUI, WPF, or WinForms.
 
 - Keep the browser-local mode working at every stage.
 - Keep all destructive operations behind dry-run/apply flows.
+- Keep one React UI that works in both browser-local mode and desktop mode.
 - Do not commit heavy runtime data: actor DB, actor photos, videos, FAISS indexes,
   embeddings, downloaded ML models, thumbnails, uploads.
 - Prefer backend API/job orchestration over launching scripts directly from UI.
@@ -36,6 +40,8 @@ Possible later shell: WebView2 with WinUI, WPF, or WinForms.
   practical.
 - The desktop app must start and stop the backend predictably.
 - The desktop shell is replaceable; React and FastAPI must not depend on Electron.
+- English-only UI is acceptable during migration. Russian localization is a
+  later polish task, not a blocker for desktop stability.
 
 ## Phase 0 - Stabilize The Existing App
 
@@ -106,9 +112,12 @@ Acceptance criteria:
 - Logs are readable while the job is still running.
 - A failed script surfaces a non-zero exit code and useful error text.
 
-## Phase 2 - Maintenance UI In React
+## Phase 2 - React App Control Surface
 
-Goal: expose the job API in the existing frontend before desktop packaging.
+Goal: turn the existing React frontend into the single control surface for the
+local service before desktop packaging. This includes maintenance jobs, but also
+service state, paths, diagnostics, and workflows that currently require terminal
+or browser juggling.
 
 Views:
 
@@ -119,6 +128,10 @@ Views:
 - Apply confirmation
 - Index status panel
 - Runtime paths panel
+- Service diagnostics panel
+- Startup/readiness state
+- Clear errors for missing models, missing data paths, missing StashDB key, and
+  unavailable video folders
 
 UI principles:
 
@@ -127,18 +140,24 @@ UI principles:
 - Stable card sizes, predictable controls, clear danger states.
 - Long logs should be readable and scrollable.
 - Destructive actions must be visually distinct and require confirmation.
+- Prefer English labels while the desktop migration is active. Do not spend
+  migration time maintaining full bilingual copy unless the feature requires it.
 
 Acceptance criteria:
 
 - A user can repair empty actor photos from UI.
 - A user can rebuild the FAISS index from UI.
 - A user can run cleanup dry-run, inspect logs, then apply.
+- A user can see configured runtime paths and obvious readiness problems without
+  opening a terminal.
 - UI remains usable while a job runs.
 - Browser mode still works without Electron.
 
-## Phase 3 - Electron Shell Prototype
+## Phase 3 - Electron Desktop Shell Prototype
 
-Goal: create the first desktop wrapper without changing core app logic.
+Goal: create the first desktop application shell without changing core app
+logic. The shell must own the local backend lifecycle and show the same React UI
+inside a native app window.
 
 Deliverables:
 
@@ -149,7 +168,13 @@ Deliverables:
   - waits for `/api/health`;
   - opens the React UI;
   - forwards backend URL to the renderer;
-  - stops backend on exit.
+  - stops backend on exit;
+  - captures backend startup logs;
+  - shows a readable failure screen when startup fails.
+- Desktop renderer contract:
+  - use the universal API client;
+  - read backend base URL from injected runtime config;
+  - avoid Electron-only code in ordinary React components.
 - Development mode:
   - use Vite dev server.
 - Production mode:
@@ -160,6 +185,7 @@ Acceptance criteria:
 - `npm run desktop:dev` opens the app window and starts backend.
 - Closing the app stops the backend process.
 - Backend startup failure shows a readable desktop error screen.
+- The user does not need to open a browser or terminal for normal use.
 - Browser mode is unaffected.
 
 ## Phase 4 - Desktop Packaging
@@ -228,6 +254,7 @@ Tasks:
 - Health diagnostics screen.
 - Update README and troubleshooting docs.
 - Smoke test script for browser and desktop modes.
+- Translation/i18n cleanup after the desktop flow is stable.
 
 Acceptance criteria:
 
@@ -246,4 +273,3 @@ Default order for future work:
 4. Add Electron shell.
 5. Package portable app.
 6. Evaluate WebView2 replacement.
-
