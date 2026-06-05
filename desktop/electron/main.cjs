@@ -7,6 +7,7 @@ const path = require('path')
 const { pathToFileURL } = require('url')
 
 app.setName('Face Recognition Service')
+app.setAppUserModelId('local.face-recognition-service')
 
 const isPackaged = app.isPackaged
 const ROOT_DIR = isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', '..')
@@ -14,9 +15,7 @@ const BACKEND_DIR = isPackaged ? path.join(process.resourcesPath, 'backend') : p
 const FRONTEND_DIST = isPackaged
   ? path.join(process.resourcesPath, 'frontend', 'index.html')
   : path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
-const ICON_PATH = isPackaged
-  ? path.join(process.resourcesPath, 'assets', 'app-icon.ico')
-  : path.join(__dirname, 'assets', 'app-icon.ico')
+const ICON_PATH = resolveIconPath()
 const LOG_DIR = isPackaged ? path.join(app.getPath('userData'), 'logs') : path.join(ROOT_DIR, 'logs')
 const isDev = process.argv.includes('--dev') || process.env.ELECTRON_DEV === '1'
 const isSmokeTest = process.argv.includes('--smoke-test')
@@ -29,6 +28,14 @@ let mainWindow = null
 let backendLogPath = null
 let isQuitting = false
 let runtimeDir = DEFAULT_RUNTIME_DIR
+
+function resolveIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'assets', 'app-icon.ico'),
+    path.join(__dirname, 'assets', 'app-icon.ico'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[candidates.length - 1]
+}
 
 function ensureLogDir() {
   fs.mkdirSync(LOG_DIR, { recursive: true })

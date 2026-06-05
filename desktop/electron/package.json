@@ -50,6 +50,14 @@
         "to": "frontend"
       },
       {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "app-icon.ico",
+          "app-icon.png"
+        ]
+      },
+      {
         "from": "../../data/icons",
         "to": "data/icons",
         "filter": [
