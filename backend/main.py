@@ -81,24 +81,38 @@ async def startup_event():
     except Exception as e:
         print(f"[Startup Warning] Could not initialize database: {e}")
 
-    # Ensure directories exist
+    # Check missing data
+    is_missing_data = False
     try:
-        settings.actors_dir.mkdir(parents=True, exist_ok=True)
-        settings.faiss_index_dir.mkdir(parents=True, exist_ok=True)
-        (settings.base_dir / "data" / "uploads").mkdir(parents=True, exist_ok=True)
-        (settings.base_dir / "models").mkdir(parents=True, exist_ok=True)
+        if not settings.base_dir.exists():
+            is_missing_data = True
+        else:
+            settings.actors_dir.mkdir(parents=True, exist_ok=True)
+            settings.faiss_index_dir.mkdir(parents=True, exist_ok=True)
+            (settings.base_dir / "data" / "uploads").mkdir(parents=True, exist_ok=True)
+            (settings.base_dir / "models").mkdir(parents=True, exist_ok=True)
     except Exception as e:
         print(f"[Startup Warning] Could not create external directories: {e}")
+        is_missing_data = True
 
-    # Generate missing thumbnails in background thread
-    import threading
-    from routes.videos import generate_missing_thumbnails
-    threading.Thread(target=generate_missing_thumbnails, daemon=True).start()
+    if not settings.faiss_index_path.exists():
+        is_missing_data = True
 
-    # Preload ML models
-    print("Preloading face detection and recognition models...")
-    from models.face_detector import FaceDetector
-    FaceDetector()
+    if not is_missing_data:
+        # Generate missing thumbnails in background thread
+        import threading
+        from routes.videos import generate_missing_thumbnails
+        threading.Thread(target=generate_missing_thumbnails, daemon=True).start()
+
+        # Preload ML models
+        print("Preloading face detection and recognition models...")
+        try:
+            from models.face_detector import FaceDetector
+            FaceDetector()
+        except Exception as e:
+            print(f"[Startup Warning] Could not preload models: {e}")
+    else:
+        print("[Startup Warning] Missing required external data. Skipping model preload.")
 
     print("=" * 60)
     print("Face Recognition Service starting...")
@@ -127,41 +141,62 @@ async def health_check():
     if not settings.faiss_index_path.exists():
         errors.append(f"FAISS index file missing: {settings.faiss_index_path}")
     
+    warnings = []
+    if not settings.videos_dir.exists():
+        warnings.append(f"Videos directory not found: {settings.videos_dir}")
+
     # Attempt DB read safely
     actors_count = 0
-    try:
-        actors_count = actor_db.get_actors_count()
-    except Exception as e:
-        errors.append(f"Database unavailable: {e}")
+    if not errors:
+        try:
+            actors_count = actor_db.get_actors_count()
+        except Exception as e:
+            errors.append(f"Database unavailable: {e}")
 
-    try:
-        detector = FaceDetector()
-        model_loaded = detector.model_loaded
-    except Exception as e:
-        model_loaded = False
-        errors.append(f"Models unavailable: {e}")
+    model_loaded = False
+    faiss_available = False
+    index_size = 0
 
-    vector_store = VectorStore()
-    try:
-        if not vector_store.is_loaded:
-            vector_store.load_index()
-    except Exception as e:
-        errors.append(f"VectorStore error: {e}")
+    if not errors:
+        try:
+            detector = FaceDetector()
+            model_loaded = detector.model_loaded
+        except Exception as e:
+            errors.append(f"Models unavailable: {e}")
 
-    faiss_available = vector_store.is_loaded
+        try:
+            vector_store = VectorStore()
+            if not vector_store.is_loaded:
+                vector_store.load_index()
+            faiss_available = vector_store.is_loaded
+            index_size = vector_store.index_size
+        except Exception as e:
+            errors.append(f"VectorStore error: {e}")
 
     if errors or actors_count == 0 or not faiss_available:
-        status = "config_required"
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "config_required",
+                "actors_count": actors_count,
+                "index_size": index_size,
+                "faiss_available": faiss_available,
+                "model_loaded": model_loaded,
+                "errors": errors,
+                "warnings": warnings
+            }
+        )
     else:
         status = "healthy"
 
     return {
         "status": status,
         "actors_count": actors_count,
-        "index_size": vector_store.index_size,
+        "index_size": index_size,
         "faiss_available": faiss_available,
         "model_loaded": model_loaded,
-        "errors": errors
+        "errors": errors,
+        "warnings": warnings
     }
 
 
