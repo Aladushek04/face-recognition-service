@@ -135,3 +135,54 @@ export interface ToolJobsResponse {
   job_types: Record<string, ToolJobTypeInfo>
   jobs: ToolJob[]
 }
+
+export type SystemCheckStatus = 'ok' | 'warning' | 'error'
+
+export interface SystemPathStatus {
+  path: string
+  exists: boolean
+  is_dir: boolean
+  is_file: boolean
+  size_bytes: number | null
+  updated_at: number | null
+  required: boolean
+  ok: boolean
+}
+
+export interface SystemCheck {
+  id: string
+  label: string
+  status: SystemCheckStatus
+  message: string
+}
+
+export interface SystemStatus {
+  status: SystemCheckStatus
+  service: {
+    name: string
+    version: string
+    python: string
+    pid: number
+  }
+  server: {
+    host: string
+    port: number
+    debug: boolean
+    cors_origins: string[]
+  }
+  features: {
+    stashdb_configured: boolean
+    model_loaded: boolean
+    faiss_available: boolean
+    browser_mode_supported: boolean
+    desktop_mode_supported: boolean
+  }
+  counts: {
+    actors: number
+    actor_images: number
+    faiss_vectors: number
+    model_files: number
+  }
+  paths: Record<string, SystemPathStatus>
+  checks: SystemCheck[]
+}

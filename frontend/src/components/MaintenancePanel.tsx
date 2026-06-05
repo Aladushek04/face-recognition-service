@@ -4,23 +4,27 @@ import {
   CheckCircle2,
   FileText,
   Hammer,
+  HardDrive,
   Loader2,
   Play,
   RefreshCw,
   ShieldAlert,
   Square,
+  Server,
   Terminal,
   Wrench,
   XCircle,
 } from 'lucide-react'
 import {
   cancelToolJob,
+  getApiBaseUrl,
+  getSystemStatus,
   getToolJobLogs,
   getToolJobs,
   startToolJob,
 } from '../lib/api'
 import { useUiPreferences } from '../lib/useUiPreferences'
-import type { ToolJob, ToolJobStatus, ToolJobTypeInfo } from '../types'
+import type { SystemCheckStatus, SystemStatus, ToolJob, ToolJobStatus, ToolJobTypeInfo } from '../types'
 
 interface ToolTask {
   type: string
@@ -89,6 +93,7 @@ export function MaintenancePanel() {
   const [jobTypes, setJobTypes] = useState<Record<string, ToolJobTypeInfo>>({})
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [selectedLogs, setSelectedLogs] = useState('')
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isStarting, setIsStarting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -100,13 +105,14 @@ export function MaintenancePanel() {
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? null
   const hasRunningJob = jobs.some((job) => RUNNING_STATUSES.includes(job.status))
 
-  const loadJobs = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getToolJobs()
+      const [data, status] = await Promise.all([getToolJobs(), getSystemStatus()])
       setJobs(data.jobs)
       setJobTypes(data.job_types)
+      setSystemStatus(status)
       if (!selectedJobId && data.jobs.length > 0) {
         setSelectedJobId(data.jobs[0].id)
       }
@@ -127,8 +133,8 @@ export function MaintenancePanel() {
   }, [labels.logFailed])
 
   useEffect(() => {
-    loadJobs()
-  }, [loadJobs])
+    loadDashboard()
+  }, [loadDashboard])
 
   useEffect(() => {
     if (!selectedJobId) return
@@ -142,9 +148,10 @@ export function MaintenancePanel() {
     const interval = window.setInterval(async () => {
       const previousSelected = selectedJobId
       try {
-        const data = await getToolJobs()
+        const [data, status] = await Promise.all([getToolJobs(), getSystemStatus()])
         setJobs(data.jobs)
         setJobTypes(data.job_types)
+        setSystemStatus(status)
         if (previousSelected) {
           const selectedStillExists = data.jobs.some((job) => job.id === previousSelected)
           if (selectedStillExists) {
@@ -172,7 +179,7 @@ export function MaintenancePanel() {
       const args = argsFromText(argTextByType[task.type] ?? '')
       const result = await startToolJob(task.type, { apply, args })
       setSelectedJobId(result.job.id)
-      await loadJobs()
+      await loadDashboard()
       await loadLogs(result.job.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : labels.startFailed)
@@ -187,7 +194,7 @@ export function MaintenancePanel() {
     if (!ok) return
     try {
       await cancelToolJob(selectedJob.id)
-      await loadJobs()
+      await loadDashboard()
     } catch (err) {
       setError(err instanceof Error ? err.message : labels.cancelFailed)
     }
@@ -202,7 +209,7 @@ export function MaintenancePanel() {
         </div>
         <button
           type="button"
-          onClick={loadJobs}
+          onClick={loadDashboard}
           disabled={isLoading}
           className="md-state-layer inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 text-sm font-extrabold text-on-primary shadow-md transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -217,6 +224,8 @@ export function MaintenancePanel() {
           <span>{error}</span>
         </div>
       )}
+
+      <SystemDiagnostics status={systemStatus} apiBaseUrl={getApiBaseUrl()} />
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
@@ -316,6 +325,131 @@ export function MaintenancePanel() {
       </div>
     </div>
   )
+}
+
+function SystemDiagnostics({
+  status,
+  apiBaseUrl,
+}: {
+  status: SystemStatus | null
+  apiBaseUrl: string
+}) {
+  const pathEntries = status
+    ? [
+        ['Base', status.paths.base_dir],
+        ['Models', status.paths.models_dir],
+        ['Actors', status.paths.actors_dir],
+        ['Videos', status.paths.videos_dir],
+        ['FAISS', status.paths.faiss_index],
+        ['Jobs', status.paths.jobs_dir],
+      ].filter((entry): entry is [string, NonNullable<SystemStatus['paths'][string]>] => Boolean(entry[1]))
+    : []
+
+  return (
+    <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="md-tonal-card min-w-0 p-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl ${statusTone(status?.status ?? 'warning')}`}>
+              <Server size={20} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-title-large text-on-surface">Service Readiness</h3>
+              <p className="mt-1 truncate text-xs text-on-surface-variant">API: {apiBaseUrl}</p>
+            </div>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${statusPill(status?.status ?? 'warning')}`}>
+            {status?.status ?? 'loading'}
+          </span>
+        </div>
+
+        {status ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {status.checks.map((check) => (
+              <div key={check.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
+                <div className="flex items-center gap-2">
+                  <CheckIcon status={check.status} />
+                  <span className="truncate text-sm font-extrabold text-on-surface">{check.label}</span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">{check.message}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-h-[132px] items-center justify-center rounded-xl border border-dashed border-outline-variant text-sm text-on-surface-variant">
+            Loading diagnostics...
+          </div>
+        )}
+      </div>
+
+      <div className="md-tonal-card min-w-0 p-4">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-container text-primary-700">
+            <HardDrive size={20} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-title-large text-on-surface">Runtime Paths</h3>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Read-only for Phase 2.5. Editing comes after the desktop shell contract is stable.
+            </p>
+          </div>
+        </div>
+
+        {status ? (
+          <>
+            <div className="mb-3 grid gap-2 sm:grid-cols-4">
+              <Metric label="Actors" value={status.counts.actors.toLocaleString()} />
+              <Metric label="Images" value={status.counts.actor_images.toLocaleString()} />
+              <Metric label="Vectors" value={status.counts.faiss_vectors.toLocaleString()} />
+              <Metric label="Models" value={status.counts.model_files.toLocaleString()} />
+            </div>
+            <div className="space-y-2">
+              {pathEntries.map(([label, item]) => (
+                <div key={label} className="grid gap-1 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 sm:grid-cols-[92px_minmax(0,1fr)_auto] sm:items-center">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-on-surface-variant">{label}</span>
+                  <span className="min-w-0 break-all font-mono text-xs text-on-surface">{item.path}</span>
+                  <span className={`w-fit rounded-full px-2 py-1 text-[10px] font-extrabold uppercase ${item.exists ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
+                    {item.exists ? 'exists' : 'missing'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-[178px] items-center justify-center rounded-xl border border-dashed border-outline-variant text-sm text-on-surface-variant">
+            Waiting for backend diagnostics...
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2">
+      <div className="text-[10px] font-extrabold uppercase tracking-wider text-on-surface-variant">{label}</div>
+      <div className="mt-1 truncate text-sm font-extrabold text-on-surface">{value}</div>
+    </div>
+  )
+}
+
+function CheckIcon({ status }: { status: SystemCheckStatus }) {
+  if (status === 'ok') return <CheckCircle2 size={15} className="flex-shrink-0 text-success" />
+  if (status === 'error') return <XCircle size={15} className="flex-shrink-0 text-error" />
+  return <AlertTriangle size={15} className="flex-shrink-0 text-warning" />
+}
+
+function statusTone(status: SystemCheckStatus): string {
+  if (status === 'ok') return 'bg-success-container text-success'
+  if (status === 'error') return 'bg-error-container text-error'
+  return 'bg-warning-container text-warning'
+}
+
+function statusPill(status: SystemCheckStatus): string {
+  if (status === 'ok') return 'bg-success-container text-on-success-container'
+  if (status === 'error') return 'bg-error-container text-on-error-container'
+  return 'bg-warning-container text-on-warning-container'
 }
 
 function TaskCard({

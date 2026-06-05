@@ -3,13 +3,35 @@ import type {
   ActorListResponse,
   BatchUploadResponse,
   HealthStatus,
+  SystemStatus,
   ToolJob,
   ToolJobsResponse,
   UploadResponse,
   Video,
 } from '../types'
 
-const API_BASE = '/api'
+declare global {
+  interface Window {
+    __FACE_SERVICE_CONFIG__?: {
+      apiBaseUrl?: string
+    }
+  }
+}
+
+function resolveApiBase(): string {
+  const configured =
+    window.__FACE_SERVICE_CONFIG__?.apiBaseUrl ||
+    import.meta.env.VITE_API_BASE_URL ||
+    '/api'
+  const normalized = configured.replace(/\/+$/, '')
+  return normalized.endsWith('/api') ? normalized : `${normalized}/api`
+}
+
+const API_BASE = resolveApiBase()
+
+export function getApiBaseUrl(): string {
+  return API_BASE
+}
 
 async function responseError(response: Response, fallback: string): Promise<Error> {
   const contentType = response.headers.get('content-type') || ''
@@ -175,6 +197,14 @@ export async function getHealth(): Promise<HealthStatus> {
     throw await responseError(response, 'Failed to get health status')
   }
 
+  return response.json()
+}
+
+export async function getSystemStatus(): Promise<SystemStatus> {
+  const response = await fetch(`${API_BASE}/system/status`)
+  if (!response.ok) {
+    throw await responseError(response, 'Failed to get system status')
+  }
   return response.json()
 }
 
