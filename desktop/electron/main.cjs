@@ -6,6 +6,8 @@ const net = require('net')
 const path = require('path')
 const { pathToFileURL } = require('url')
 
+app.setName('Face Recognition Service')
+
 const isPackaged = app.isPackaged
 const ROOT_DIR = isPackaged ? process.resourcesPath : path.resolve(__dirname, '..', '..')
 const BACKEND_DIR = isPackaged ? path.join(process.resourcesPath, 'backend') : path.join(ROOT_DIR, 'backend')
@@ -15,6 +17,9 @@ const FRONTEND_DIST = isPackaged
 const LOG_DIR = isPackaged ? path.join(app.getPath('userData'), 'logs') : path.join(ROOT_DIR, 'logs')
 const isDev = process.argv.includes('--dev') || process.env.ELECTRON_DEV === '1'
 const isSmokeTest = process.argv.includes('--smoke-test')
+const DEFAULT_RUNTIME_DIR = process.platform === 'win32'
+  ? 'D:\\FaceService'
+  : path.join(app.getPath('appData'), 'FaceRecognitionService')
 
 let backendProcess = null
 let mainWindow = null
@@ -125,8 +130,12 @@ function waitForHttp(url, timeoutMs = 90000) {
 
 function startBackend(port) {
   const python = process.env.FACE_SERVICE_PYTHON || 'python'
+  const runtimeEnv = loadRuntimeEnv()
+  const baseDir = runtimeEnv.BASE_DIR || process.env.BASE_DIR || DEFAULT_RUNTIME_DIR
   const env = {
     ...process.env,
+    ...runtimeEnv,
+    BASE_DIR: baseDir,
     HOST: '127.0.0.1',
     PORT: String(port),
     PYTHONUTF8: '1',
@@ -135,6 +144,8 @@ function startBackend(port) {
   const log = fs.createWriteStream(backendLogPath, { flags: 'a' })
   log.write(`[desktop] Starting backend on 127.0.0.1:${port}\n`)
   log.write(`[desktop] Command: ${python} main.py\n\n`)
+  log.write(`[desktop] BASE_DIR=${env.BASE_DIR}\n`)
+  log.write(`[desktop] .env source=${runtimeEnv.__source || 'none'}\n\n`)
 
   backendProcess = spawn(python, ['main.py'], {
     cwd: BACKEND_DIR,
@@ -156,6 +167,45 @@ function startBackend(port) {
   backendProcess.on('error', (error) => {
     log.write(`\n[desktop] Backend spawn error: ${error.stack || error.message}\n`)
   })
+}
+
+function loadRuntimeEnv() {
+  const candidates = [
+    path.join(process.cwd(), '.env'),
+    path.join(path.dirname(process.execPath), '.env'),
+    path.join(ROOT_DIR, '.env'),
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return {
+        ...parseEnvFile(candidate),
+        __source: candidate,
+      }
+    }
+  }
+  return {}
+}
+
+function parseEnvFile(filePath) {
+  const values = {}
+  const content = fs.readFileSync(filePath, 'utf8')
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const equals = line.indexOf('=')
+    if (equals <= 0) continue
+    const key = line.slice(0, equals).trim()
+    let value = line.slice(equals + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    values[key] = value
+  }
+  return values
 }
 
 function stopBackend() {
@@ -297,6 +347,27 @@ async function openFrontend(apiBaseUrl) {
   await mainWindow.loadURL(fileUrl)
 }
 
+async function verifyRendererLoaded() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Renderer window was not created')
+  }
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+  const result = await mainWindow.webContents.executeJavaScript(`
+    (() => {
+      const root = document.getElementById('root');
+      return {
+        title: document.title,
+        rootChildren: root ? root.children.length : -1,
+        bodyTextLength: document.body ? document.body.innerText.length : 0,
+        location: window.location.href
+      };
+    })()
+  `)
+  if (!result || result.rootChildren < 1 || result.bodyTextLength < 1) {
+    throw new Error(`Renderer did not render React UI: ${JSON.stringify(result)}`)
+  }
+}
+
 async function showStartupScreen(activeStep, detail = '') {
   const steps = [
     'Prepare logs',
@@ -348,9 +419,15 @@ async function boot() {
     await showStartupScreen('Load app UI', `API: ${apiBaseUrl}`)
     await openFrontend(apiBaseUrl)
     if (isSmokeTest) {
-      setTimeout(() => app.quit(), 2500)
+      await verifyRendererLoaded()
+      setTimeout(() => app.quit(), 500)
     }
   } catch (error) {
+    if (isSmokeTest) {
+      console.error(error.stack || error.message)
+      app.exit(1)
+      return
+    }
     await showFatalScreen('Backend startup failed', `${error.stack || error.message}\n\nBackend log:\n${backendLogPath}`)
   }
 }

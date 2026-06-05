@@ -26,7 +26,8 @@ npm --prefix desktop/electron run smoke
 ```
 
 Smoke mode opens the built `frontend/dist/index.html`, starts the backend,
-waits for `/api/health`, and exits automatically.
+waits for `/api/health`, verifies that React rendered into `#root`, and exits
+automatically.
 
 ## Portable Build
 
@@ -55,6 +56,10 @@ The portable build includes:
 The portable build does not bundle Python yet. The target machine still needs a
 working Python environment with backend dependencies installed, or
 `FACE_SERVICE_PYTHON` must point to the intended Python executable.
+
+For portable `file://` loading the frontend is built with relative assets. If
+the app window is blank, rebuild with `npm run desktop:build` and run the
+portable smoke test again.
 
 ## Runtime Data
 
