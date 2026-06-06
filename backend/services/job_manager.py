@@ -181,12 +181,24 @@ class JobManager:
         return command
 
     def _sanitize_args(self, args: list[str]) -> list[str]:
+        blocked_prefixes = (
+            "--apply",
+            "--dry-run",
+            "--action",
+            "--confirm-large-delete",
+            "--force-empty-index",
+        )
         clean: list[str] = []
         for item in args:
             if not isinstance(item, str):
                 raise ValueError("All args must be strings")
             if "\x00" in item or "\r" in item or "\n" in item:
                 raise ValueError("Args must not contain control line breaks")
+            for prefix in blocked_prefixes:
+                if item == prefix or item.startswith(f"{prefix}="):
+                    raise ValueError(
+                        f"Dangerous argument '{prefix}' is controlled by the application and cannot be passed through raw args."
+                    )
             clean.append(item)
         return clean
 

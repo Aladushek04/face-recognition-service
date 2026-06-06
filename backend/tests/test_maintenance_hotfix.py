@@ -323,6 +323,45 @@ class MaintenanceHotfixTests(unittest.TestCase):
             Path("frontend/src/lib/uiPreferences.tsx").read_text(encoding="utf-8"),
         )
 
+    def test_job_manager_rejects_unsafe_user_args(self) -> None:
+        sys.path.insert(0, str(Path("backend").resolve()))
+        try:
+            job_manager_module = importlib.import_module("services.job_manager")
+            manager = job_manager_module.JobManager()
+
+            unsafe_args = [
+                "--apply",
+                "--apply=true",
+                "--dry-run",
+                "--dry-run=false",
+                "--action",
+                "--action=delete",
+                "--confirm-large-delete",
+                "--confirm-large-delete=true",
+                "--force-empty-index",
+                "--force-empty-index=true",
+            ]
+
+            for arg in unsafe_args:
+                with self.assertRaises(ValueError) as ctx:
+                    manager._sanitize_args([arg])
+                self.assertIn("controlled by the application", str(ctx.exception))
+
+            safe_args = [
+                "--limit",
+                "10",
+                "--limit=10",
+                "--min-face-area-ratio",
+                "0.01",
+                "--require-image",
+            ]
+
+            clean = manager._sanitize_args(safe_args)
+            self.assertEqual(clean, safe_args)
+        finally:
+            if sys.path[0] == str(Path("backend").resolve()):
+                sys.path.pop(0)
+
 
 if __name__ == "__main__":
     unittest.main()
