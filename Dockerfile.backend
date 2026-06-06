@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 # Copy application code and scripts
 COPY backend/ backend/
 COPY scripts/ scripts/
+COPY frontend/src/components/MaintenancePanel.tsx frontend/src/components/
+COPY frontend/src/lib/uiPreferences.tsx frontend/src/lib/
 
 # Create necessary directories
 RUN mkdir -p data/actors data/faiss_index data/uploads data/db models logs
