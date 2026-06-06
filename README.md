@@ -11,7 +11,7 @@ A local service for facial recognition of actors in photos and videos. The datab
 
 ## 📥 Installation
 
-1. Download the latest release artifact (e.g., `FaceRecognitionService-Setup-v1.0.0-813c65e.exe` or the final renamed `FaceRecognitionService-Setup-v1.0.0.exe`) from the Releases page.
+1. Download the latest release artifact (e.g., `FaceRecognitionService-Setup-v1.0.0-rc1.exe` or the final renamed `FaceRecognitionService-Setup-v1.0.0.exe`) from the Releases page.
 2. Ensure you have the required runtimes installed (the installer will automatically prompt you if they are missing):
    - **Microsoft .NET 10 Desktop Runtime (x64)**
    - **Microsoft Edge WebView2 Runtime**
