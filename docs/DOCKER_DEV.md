@@ -39,3 +39,8 @@ docker compose run --rm backend python backend/main.py --run-job scrape_stashdb 
 
 The Docker environment isolates runtime data to prevent overwriting your real `D:\FaceService` directory.
 All writable volumes (jobs, logs, db, faiss_index) are mapped to `./.docker_data/` which is ignored by Git.
+
+### Run synthetic maintenance smoke tests
+```powershell
+docker compose run --rm backend python -m unittest backend.tests.test_docker_maintenance_smoke -v
+```
