@@ -313,6 +313,7 @@ class MaintenanceHotfixTests(unittest.TestCase):
             if sys.path and sys.path[0] == str(Path("backend").resolve()):
                 sys.path.pop(0)
 
+    @unittest.skipUnless(Path("frontend/src/components/MaintenancePanel.tsx").exists(), "Frontend source not available")
     def test_ui_defaults_do_not_include_advanced_unsafe_flags(self) -> None:
         source = Path("frontend/src/components/MaintenancePanel.tsx").read_text(encoding="utf-8")
         self.assertNotIn("--force-empty-index", source)

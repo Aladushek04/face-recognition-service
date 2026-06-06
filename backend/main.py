@@ -174,7 +174,7 @@ async def health_check():
         errors.append(f"FAISS index file missing: {settings.faiss_index_path}")
     
     warnings = []
-    if not settings.videos_dir.exists():
+    if not settings.videos_dir or not settings.videos_dir.exists():
         warnings.append(f"Videos directory not found: {settings.videos_dir}")
 
     # Attempt DB read safely

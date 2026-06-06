@@ -5,18 +5,25 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libgl1 \
+    libglib2.0-0 \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copy application code
-COPY backend/ .
+# Copy application code and scripts
+COPY backend/ backend/
+COPY scripts/ scripts/
 
 # Create necessary directories
-RUN mkdir -p data/actors data/faiss_index data/uploads data/db models
+RUN mkdir -p data/actors data/faiss_index data/uploads data/db models logs
+
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

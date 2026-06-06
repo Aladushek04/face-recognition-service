@@ -1,0 +1,17 @@
+.git
+.env
+.env.docker.local
+.docker_data
+data
+models
+logs
+tests
+frontend/node_modules
+releases
+*.exe
+*.zip
+*.log
+actors
+backend/build
+backend/dist
+backend/__pycache__

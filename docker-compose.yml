@@ -7,35 +7,20 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./models:/app/models
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: .env.docker.local
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      - ./.docker_data/data:/app/data
+      - ./.docker_data/logs:/app/logs
+      - ./.docker_data/jobs:/app/data/jobs
+      - ${MODELS_DIR:-./.docker_data/models}:/app/models:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Frontend dev server (or use nginx for production)
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend/src:/app/src
-    environment:
-      - VITE_API_URL=http://localhost:8000
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-
-volumes:
-  data:
-  models:
