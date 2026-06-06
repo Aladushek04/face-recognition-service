@@ -24,7 +24,16 @@ Write-Host "Version: $Version"
 Write-Host "ReleaseName: $ReleaseName"
 Write-Host "OutputRoot: $OutputRoot"
 
-# 1. Run publish script
+# 1. Build packaged backend
+$BuildBackendScript = Join-Path $RepoRoot "scripts\build-backend.ps1"
+if (-not (Test-Path $BuildBackendScript)) {
+    Write-Error "Backend build script not found: $BuildBackendScript"
+}
+
+Write-Host "Running build-backend.ps1..."
+& $BuildBackendScript
+
+# 2. Run publish script
 $PublishScript = Join-Path $RepoRoot "desktop\wpf\FaceRecognition.Desktop\scripts\publish-desktop.ps1"
 if (-not (Test-Path $PublishScript)) {
     Write-Error "Publish script not found: $PublishScript"
@@ -33,7 +42,7 @@ if (-not (Test-Path $PublishScript)) {
 Write-Host "Running publish-desktop.ps1 -IncludeBackend..."
 & $PublishScript -IncludeBackend
 
-# 2. Determine publish output directory
+# 3. Determine publish output directory
 $WpfDir = Join-Path $RepoRoot "desktop\wpf\FaceRecognition.Desktop"
 $CsprojPath = Join-Path $WpfDir "FaceRecognition.Desktop.csproj"
 $TargetFramework = ([xml](Get-Content $CsprojPath)).Project.PropertyGroup.TargetFramework
@@ -44,7 +53,7 @@ if (-not (Test-Path $PublishOutputDir)) {
     Write-Error "Publish output directory not found: $PublishOutputDir"
 }
 
-# 3. Create output directory
+# 4. Create output directory
 $ReleasesDir = $OutputRoot
 $ReleaseTargetDir = Join-Path $ReleasesDir $ReleaseName
 $ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
@@ -73,7 +82,7 @@ if ((Test-Path $ReleaseTargetDir) -or (Test-Path $ZipPath) -or (Test-Path $Check
 
 New-Item -ItemType Directory -Force -Path $ReleaseTargetDir | Out-Null
 
-# 4. Copy required files
+# 5. Copy required files
 Write-Host "Copying files to $ReleaseTargetDir..."
 
 # WPF Executables, DLLs, and Runtimes
@@ -133,11 +142,11 @@ Set-Content -Path $ReadmePath -Value $ReadmeContent -Encoding ASCII -Force
 
 Write-Host "Files copied."
 
-# 5. Create ZIP
+# 6. Create ZIP
 Write-Host "Compressing to $ZipPath..."
 Compress-Archive -Path $ReleaseTargetDir -DestinationPath $ZipPath -CompressionLevel Optimal
 
-# 6. Generate SHA256 Checksum
+# 7. Generate SHA256 Checksum
 Write-Host "Generating SHA256 Checksums..."
 $ZipHash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash
 "$ZipHash  $ReleaseName.zip" | Out-File -FilePath $ChecksumPath -Encoding ASCII
