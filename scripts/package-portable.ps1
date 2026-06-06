@@ -122,8 +122,11 @@ You must go to the "Settings" page in the UI to point the app to your external d
 
 == Data Requirements ==
 This portable release does NOT bundle user data or models. You must provide:
-- D:\FaceService (or equivalent) for Faiss indices, Actor photos, and ONNX models.
-- D:\Videos (or equivalent) for video files.
+- <your-face-service-data-folder> for the main service data folder.
+- <your-actors-folder> for actor reference photos.
+- <your-models-folder> for ONNX face models.
+- <your-faiss-index-folder> for FAISS index files.
+- <your-videos-folder> for video files.
 
 == System Requirements ==
 1. .NET 10 Desktop Runtime: This release is Framework-Dependent. You MUST install the Microsoft .NET 10 Desktop Runtime (x64) to launch the shell.
