@@ -55,21 +55,12 @@ public partial class MainWindow : Window
 
         MainWebView.CoreWebView2.NavigationStarting += (_, args) =>
         {
-            var uri = args.Uri;
-            var allowed = uri.StartsWith("https://app.face.local") || uri.StartsWith("http://127.0.0.1");
-            if (!allowed)
-            {
-                args.Cancel = true;
-                try 
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = uri,
-                        UseShellExecute = true
-                    });
-                } 
-                catch { /* ignore */ }
-            }
+            HandleExternalNavigation(args.Uri, () => args.Cancel = true);
+        };
+
+        MainWebView.CoreWebView2.NewWindowRequested += (_, args) =>
+        {
+            HandleExternalNavigation(args.Uri, () => args.Handled = true);
         };
 
         var frontendDist = AppPaths.FrontendDistPath;
@@ -96,6 +87,40 @@ public partial class MainWindow : Window
         }
 
         MainWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+    }
+
+    private void HandleExternalNavigation(string uriString, Action cancelAction)
+    {
+        if (string.IsNullOrWhiteSpace(uriString))
+        {
+            cancelAction();
+            return;
+        }
+
+        if (uriString.StartsWith("https://app.face.local", StringComparison.OrdinalIgnoreCase) ||
+            uriString.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+            uriString.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        cancelAction();
+
+        if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
+        {
+            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            {
+                try 
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = uri.AbsoluteUri,
+                        UseShellExecute = true
+                    });
+                } 
+                catch { }
+            }
+        }
     }
 
     private void AppendLog(string message)
