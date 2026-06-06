@@ -72,7 +72,6 @@ def system_status() -> dict[str, Any]:
         pass
 
     models_dir = settings.base_dir / "models"
-    jobs_dir = settings.base_dir / "data" / "jobs"
     uploads_dir = settings.base_dir / "data" / "uploads"
     thumbnails_dir = settings.base_dir / "thumbnails"
     embeddings_dir = settings.base_dir / "data" / "embeddings"
@@ -86,7 +85,8 @@ def system_status() -> dict[str, Any]:
         "faiss_index_dir": _path_status(settings.faiss_index_dir),
         "faiss_index": _path_status(settings.faiss_index_path),
         "faiss_id_map": _path_status(settings.faiss_id_map_path),
-        "jobs_dir": _path_status(jobs_dir, should_exist=False),
+        "jobs_dir": _path_status(settings.jobs_dir, should_exist=False),
+        "logs_dir": _path_status(settings.logs_dir, should_exist=False),
         "uploads_dir": _path_status(uploads_dir, should_exist=False),
         "thumbnails_dir": _path_status(thumbnails_dir, should_exist=False),
         "embeddings_dir": _path_status(embeddings_dir, should_exist=False),
@@ -150,7 +150,7 @@ def system_status() -> dict[str, Any]:
         "status": overall,
         "service": {
             "name": "Face Recognition Service",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "python": sys.version.split()[0],
             "pid": os.getpid(),
         },
