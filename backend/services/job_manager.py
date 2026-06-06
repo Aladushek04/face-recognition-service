@@ -253,7 +253,7 @@ class JobManager:
                 self._processes.pop(job_id, None)
                 
             job = self.get_job(job_id)
-            if job and job.get("status") == "completed" and job["name"] == "build_index":
+            if job and job.get("status") == "completed" and job.get("type") == "build_index":
                 try:
                     from routes.actors import get_vector_store as a_vs
                     from routes.stashdb import get_vector_store as s_vs
