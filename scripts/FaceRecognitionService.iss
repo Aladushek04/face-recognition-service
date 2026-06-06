@@ -1,12 +1,12 @@
 [Setup]
 AppName=Face Recognition Service
-AppVersion=1.0.0
+AppVersion=1.0.1
 DefaultDirName={localappdata}\Programs\Face Recognition Service
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 OutputDir=..\releases
-OutputBaseFilename=FaceRecognitionService-Setup-v1.0.0
+OutputBaseFilename=FaceRecognitionService-Setup-v1.0.1
 Compression=lzma2
 SolidCompression=yes
 SetupIconFile=..\desktop\wpf\FaceRecognition.Desktop\Assets\app-icon.ico

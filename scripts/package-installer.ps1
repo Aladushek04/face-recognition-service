@@ -54,4 +54,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "--- Packaging Complete ---"
-Write-Host "Installer successfully built at: $ReleasesDir\FaceRecognitionService-Setup-v1.0.0.exe"
+Write-Host "Installer successfully built at: $ReleasesDir\FaceRecognitionService-Setup-v1.0.1.exe"
