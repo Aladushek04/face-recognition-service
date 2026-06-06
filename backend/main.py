@@ -42,6 +42,7 @@ if __name__ == "__main__" and len(sys.argv) >= 3 and sys.argv[1] == "--run-job":
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
@@ -65,6 +66,12 @@ app = FastAPI(
     version="1.0.1",
     docs_url="/docs",
     redoc_url="/redoc",
+)
+
+# Host header validation
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["127.0.0.1", "localhost", "::1"]
 )
 
 # CORS middleware for frontend
