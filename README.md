@@ -1,78 +1,87 @@
 # Face Recognition Service
 
-Локальный сервис для распознавания актеров по лицам на фото и видео. База актеров, изображения, embeddings, FAISS-индекс и видео-метаданные хранятся локально. StashDB используется только как внешний источник метаданных и изображений, если задан API-ключ.
+A local service for facial recognition of actors in photos and videos. The database of actors, images, embeddings, FAISS index, and video metadata are stored locally. StashDB is optionally used as an external source for metadata and images if an API key is provided.
 
-## Что умеет проект
+## 🚀 Key Features
+- **Local Desktop UI**: Embedded Chromium shell via WebView2.
+- **Offline ML**: Bundled hidden PyInstaller FastAPI backend with GPU (CUDA) and CPU support.
+- **Smart Directory Management**: Writable configurations (`config.json`), jobs, and logs are kept in safe local paths (`%LOCALAPPDATA%\Programs\Face Recognition Service`), while massive ML data and video files reside on user-defined drives.
+- **Safe Setup Mode**: Installer starts the app with safe, empty defaults that require manual first-run configuration.
+- **Maintenance Center**: In-app UI for managing FAISS indexing, actor/image cleanup, and StashDB backfills as background jobs.
 
-- Распознавать лица на загруженных изображениях.
-- Показывать уверенные совпадения и ближайших кандидатов.
-- Назначать найденное лицо новому или существующему актеру прямо из загруженного фото.
-- Вести локальную базу актеров с метаданными, фото и тегами.
-- Импортировать performer-профили из StashDB вручную через UI или массово через скриппер.
-- Фильтровать StashDB-импорт по полу, breast type, сценам, годам, активности, наличию фото и странам.
-- Собирать FAISS-индекс из reference-фото и кешировать embeddings.
-- Сканировать локальную папку видео, обрабатывать видео по очереди, строить таймлайн распознанных актеров.
-- Матчить видео со сценами StashDB, скачивать обложку, привязывать сцену вручную или по URL.
-- Чистить актеров и reference-фото через dry-run скрипты.
-- Работать через React UI или FastAPI API.
+## 📥 Installation
 
-## Стек
+1. Download the latest `FaceRecognitionService-Setup-v1.0.0.exe` from the Releases page.
+2. Ensure you have the required runtimes installed (the installer will automatically prompt you if they are missing):
+   - **Microsoft .NET 10 Desktop Runtime (x64)**
+   - **Microsoft Edge WebView2 Runtime**
+3. Run the setup executable. The application will install per-user into `%LOCALAPPDATA%\Programs\Face Recognition Service`.
+4. Launch the application from your Start Menu.
+5. On your first launch, the app will display a **Configuration Required** screen.
 
+> **Note**: No Python environment, Node.js, or source repository is required on the user machine. The backend runs completely bundled as `FaceBackend.exe`. The app cleanly manages its child processes and leaves no orphans when closed.
+
+## ⚙️ First-Run Configuration
+
+By default, the installer deploys a safe `config.example.json` with empty external paths. You must configure these through the app Settings before the AI can initialize.
+
+1. Go to **Settings**.
+2. Point the directories to your external massive storage drives. Expected production paths might look like:
+   - **Base Directory**: `D:\FaceService`
+   - **Actors Directory**: `D:\FaceService\actors`
+   - **Models Directory**: `D:\FaceService\models`
+   - **FAISS Index Directory**: `D:\FaceService\data\faiss_index`
+   - **Videos Directory**: `D:\Videos`
+3. Click **Validate** and ensure the backend restarts.
+4. You should see `Model Ready` with the number of loaded actors and vectors, indicating successful initialization.
+
+### Configuration & Update Policy
+- `config.json` is safely preserved during reinstalls and version upgrades.
+- `config.example.json` is refreshed during upgrades to provide the newest schema.
+- Runtime application logs and background maintenance jobs are stored safely in your installation directory (`%LOCALAPPDATA%\Programs\Face Recognition Service\logs` and `\data\jobs`).
+
+## 💻 GPU Support
+
+NVIDIA GPUs are fully supported for accelerated face detection and embedding extraction via the `CUDAExecutionProvider`.
+- If a compatible NVIDIA GPU and driver are found, they will be utilized automatically.
+- **No external CUDA Toolkit installation is required**, as the necessary libraries are bundled.
+- If no GPU is available, the backend safely falls back to CPU execution (`CPUExecutionProvider`).
+
+---
+
+## 🛠️ Developer Guide (Running from Source)
+
+The following instructions are only for developers who wish to modify the source code.
+
+### Стек
 - Backend: FastAPI, SQLite, InsightFace, ONNX Runtime, OpenCV, FAISS.
 - Frontend: React 18, Vite, TypeScript, Tailwind CSS, Zustand, lucide-react.
-- Runtime data: SQLite DB, actor images, FAISS index, embedding cache, thumbnails, uploads.
+- Desktop Shell: WPF (.NET 10), WebView2.
 
-## Структура
-
-```text
-backend/                 FastAPI backend, routes, DB, ML models
-frontend/                React/Vite frontend
-scripts/                 service start, StashDB scraper, cleanup, index build
-data/icons/              service/source icons for frontend metadata
-.env.example             example environment config
-start_service.bat        Windows helper to start backend + frontend
-scrapper.bat             Windows helper for scraper/cleanup/index menu
-docker-compose.yml       optional Docker setup
-```
-
-Тяжелые runtime-данные лучше хранить вне репозитория через `BASE_DIR`, `ACTORS_DIR`, `FAISS_INDEX_DIR` и `VIDEOS_DIR`.
-
-## Требования
-
+### Требования для разработки
 - Windows или Linux.
 - Python 3.10+.
 - Node.js 18+.
-- 4 GB RAM минимум, больше лучше.
-- CPU работает, NVIDIA GPU опциональна.
-- StashDB API key нужен только для StashDB-импорта и scene matching.
 
-Python-зависимости берутся из [backend/requirements.txt](backend/requirements.txt). По умолчанию там указан `onnxruntime-gpu`; если GPU не нужен или установка GPU runtime мешает, замените его на `onnxruntime`.
-
-## Быстрый старт на Windows
-
+### Быстрый старт из исходников
 1. Установите backend-зависимости:
-
 ```powershell
-cd F:\SillyTavern\face-recognition-service\backend
+cd backend
 python -m pip install -r requirements.txt
 ```
 
 2. Установите frontend-зависимости:
-
 ```powershell
-cd F:\SillyTavern\face-recognition-service\frontend
+cd frontend
 npm install
 ```
 
 3. Создайте `.env` из примера:
-
 ```powershell
-cd F:\SillyTavern\face-recognition-service
 copy .env.example .env
 ```
 
 4. Отредактируйте `.env`. Минимально проверьте пути:
-
 ```env
 BASE_DIR=D:\FaceService
 ACTORS_DIR=D:\FaceService\actors
@@ -80,40 +89,22 @@ FAISS_INDEX_DIR=D:\FaceService\data\faiss_index
 VIDEOS_DIR=D:\Videos
 ```
 
-5. Запустите сервис:
-
+5. Запустите сервис через helper-скрипт (стартует backend и frontend):
 ```powershell
 .\start_service.bat
 ```
-
-После запуска:
-
 - Web UI: `http://127.0.0.1:3000`
 - API: `http://127.0.0.1:8000`
 - API docs: `http://127.0.0.1:8000/docs`
 
-`start_service.bat` проверяет порты 8000 и 3000, запускает backend и frontend, затем держит окно открытым. Для остановки нажмите `Ctrl+C`.
-
-## Ручной запуск
-
-Backend:
-
+6. Или запустите WPF Desktop Shell:
 ```powershell
-cd F:\SillyTavern\face-recognition-service\backend
-python main.py
+dotnet run --project desktop\wpf\FaceRecognition.Desktop\FaceRecognition.Desktop.csproj
 ```
 
-Frontend:
-
-```powershell
-cd F:\SillyTavern\face-recognition-service\frontend
-npm run dev -- --host 127.0.0.1 --port 3000
-```
-
-## Конфигурация `.env`
+### Конфигурация `.env` (Source)
 
 Основные параметры:
-
 ```env
 HOST=0.0.0.0
 PORT=8000
