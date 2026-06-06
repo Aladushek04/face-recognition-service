@@ -44,20 +44,30 @@ def _validate_config(config: dict):
         jobs_dir = runtime.get("jobsDir", "")
         logs_dir = runtime.get("logsDir", "")
         
-        if not base_dir or not os.path.isdir(base_dir):
+        if not base_dir:
+            errors.append("Base directory is not configured")
+        elif not os.path.isdir(base_dir):
             errors.append(f"Base directory not found: {base_dir}")
-        if not actors_dir or not os.path.isdir(actors_dir):
+        if not actors_dir:
+            errors.append("Actors directory is not configured")
+        elif not os.path.isdir(actors_dir):
             errors.append(f"Actors directory not found: {actors_dir}")
-        if not models_dir or not os.path.isdir(models_dir):
+        if not models_dir:
+            errors.append("Models directory is not configured")
+        elif not os.path.isdir(models_dir):
             errors.append(f"Models directory not found: {models_dir}")
-        if not faiss_index_dir or not os.path.isdir(faiss_index_dir):
+        if not faiss_index_dir:
+            errors.append("FAISS index directory is not configured")
+        elif not os.path.isdir(faiss_index_dir):
             errors.append(f"FAISS index directory not found: {faiss_index_dir}")
         else:
             faiss_file = os.path.join(faiss_index_dir, "face_index.faiss")
             if not os.path.isfile(faiss_file):
                 errors.append(f"FAISS index file not found: {faiss_file}")
                 
-        if not videos_dir or not os.path.isdir(videos_dir):
+        if not videos_dir:
+            warnings.append("Videos directory is not configured")
+        elif not os.path.isdir(videos_dir):
             warnings.append(f"Videos directory not found: {videos_dir}")
             
     except Exception as e:
