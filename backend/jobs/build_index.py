@@ -18,6 +18,10 @@ from pathlib import Path
 
 import numpy as np
 
+from jobs.runtime import configure_job_io  # noqa: E402
+
+configure_job_io()
+
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
 from models.face_detector import FaceDetector  # noqa: E402

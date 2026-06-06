@@ -27,6 +27,7 @@ class JobDefinition:
     default_args: tuple[str, ...] = ()
     dry_run_args: tuple[str, ...] = ()
     writes_without_apply: bool = False
+    apply_arg: str | None = "--apply"
 
 
 JOB_DEFINITIONS: dict[str, JobDefinition] = {
@@ -42,7 +43,7 @@ JOB_DEFINITIONS: dict[str, JobDefinition] = {
     "cleanup_actors": JobDefinition("cleanup_actors"),
     "cleanup_empty_actor_dirs": JobDefinition("cleanup_empty_actor_dirs"),
     "cleanup_images": JobDefinition("cleanup_images"),
-    "scrape_stashdb": JobDefinition("scrape_stashdb", dry_run_args=("--dry-run",)),
+    "scrape_stashdb": JobDefinition("scrape_stashdb", dry_run_args=("--dry-run",), apply_arg=None),
 }
 
 
@@ -170,8 +171,8 @@ class JobManager:
             if not main_script.exists():
                 main_script = PROJECT_ROOT / "backend/main.py"
             command = [sys.executable, str(main_script), "--run-job", job_name, *definition.default_args]
-        if apply and definition.supports_apply and "--apply" not in args:
-            command.append("--apply")
+        if apply and definition.supports_apply and definition.apply_arg and definition.apply_arg not in args:
+            command.append(definition.apply_arg)
         if not apply:
             for item in definition.dry_run_args:
                 if item not in args:

@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import base64
 import itertools
-import os
 import re
 import shutil
 import sqlite3
@@ -25,17 +24,18 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(PROJECT_ROOT / ".env")
 
+from jobs.runtime import configure_job_io  # noqa: E402
+
+configure_job_io()
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
 
 
-API_URL = os.getenv("STASHDB_API_URL", "https://stashdb.org/graphql")
-API_KEY = os.getenv("STASHDB_API_KEY", "")
+API_URL = settings.stashdb_api_url
+API_KEY = settings.stashdb_api_key
 REQUEST_DELAY = 2.0
 DEFAULT_LIMIT = 50
 DEFAULT_PAGE_SIZE = 50

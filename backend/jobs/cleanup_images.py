@@ -8,6 +8,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from jobs.runtime import configure_job_io  # noqa: E402
+
+configure_job_io()
+
 from database import actor_db  # noqa: E402
 from models.face_detector import FaceDetector  # noqa: E402
 
@@ -70,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     checked = 0
     kept = 0
     candidates: list[tuple[dict, str]] = []
+    missing = 0
+    no_usable_face = 0
+    processing_errors = 0
+    skipped_due_to_errors = 0
 
     detector = FaceDetector()
     if not detector.model_loaded:
@@ -87,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Found {total} reference image rows.")
 
         if not image_path.exists():
+            missing += 1
             if args.delete_missing:
                 candidates.append((image, "missing file"))
                 print(f"  ! {label}: missing file")
@@ -97,7 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             usable = has_usable_face(detector, image_path, args.min_face_area_ratio)
         except Exception as exc:
-            candidates.append((image, f"processing error: {exc}"))
+            processing_errors += 1
+            skipped_due_to_errors += 1
             print(f"  ! {label}: processing error: {exc}")
             continue
 
@@ -105,12 +115,17 @@ def main(argv: list[str] | None = None) -> int:
             kept += 1
             continue
 
+        no_usable_face += 1
         candidates.append((image, "no usable face"))
         print(f"  ! {label}: no usable face")
 
     print("-" * 50)
     print(f"Images checked: {checked}")
     print(f"Images kept: {kept}")
+    print(f"Missing files: {missing}")
+    print(f"No usable face: {no_usable_face}")
+    print(f"Processing errors: {processing_errors}")
+    print(f"Skipped due to errors: {skipped_due_to_errors}")
     print(f"Images matching delete criteria: {len(candidates)}")
     print("Mode:", "APPLY" if args.apply else "DRY-RUN")
 
@@ -119,7 +134,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     deleted = 0
-    for image, _reason in candidates:
+    for image, reason in candidates:
+        if reason.startswith("processing error"):
+            continue
         if actor_db.delete_actor_image(image["id"]):
             deleted += 1
 

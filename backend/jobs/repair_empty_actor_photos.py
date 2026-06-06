@@ -13,31 +13,24 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(PROJECT_ROOT / ".env")
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+from jobs.runtime import configure_job_io  # noqa: E402
 
+configure_job_io()
 from config import settings  # noqa: E402
 from database import actor_db  # noqa: E402
 
 
-API_URL = os.getenv("STASHDB_API_URL", "https://stashdb.org/graphql")
-API_KEY = os.getenv("STASHDB_API_KEY", "")
+API_URL = settings.stashdb_api_url
+API_KEY = settings.stashdb_api_key
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 QUERY_FIND_PERFORMER = """
@@ -85,14 +78,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--delete-after-failed-repair",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Delete actors that still have no photos after repair attempt.",
+        default=False,
+        help="Advanced unsafe option: delete actors that still have no photos after repair attempt.",
     )
     parser.add_argument(
         "--rebuild-index",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Run scripts/build_index.py after successful downloads/deletions.",
+        default=False,
+        help="Run build_index job after successful downloads/deletions.",
     )
     parser.add_argument(
         "--build-index-args",
@@ -235,7 +228,12 @@ def image_has_usable_face(path: Path, min_face_area_ratio: float) -> bool:
         print("     face validation skipped: detector is not loaded")
         return True
 
-    for face in detector.detect_faces(image):
+    try:
+        faces = detector.detect_faces(image)
+    except Exception as exc:
+        raise RuntimeError(f"face validation failed: {exc}") from exc
+
+    for face in faces:
         x1, y1, x2, y2 = face["bbox"]
         face_area = max(x2 - x1, 0) * max(y2 - y1, 0)
         if face_area / image_area >= min_face_area_ratio:
@@ -320,12 +318,16 @@ def choose_action(args: argparse.Namespace) -> str:
 
 
 def rebuild_index(args: argparse.Namespace) -> int:
-    command = [sys.executable, str(PROJECT_ROOT / "scripts" / "build_index.py")]
-    if args.build_index_args.strip():
-        command.extend(args.build_index_args.split())
-    print("\nRebuilding FAISS index...")
-    print(" ".join(command))
-    return subprocess.run(command, cwd=PROJECT_ROOT, check=False).returncode
+    from jobs import build_index  # noqa: PLC0415
+
+    build_args = args.build_index_args.split() if args.build_index_args.strip() else []
+    print("\nRebuilding FAISS index in-process...")
+    print("build_index", " ".join(build_args))
+    try:
+        return build_index.main(build_args)
+    except Exception as exc:
+        print(f"ERROR: Rebuild failed: {exc}")
+        return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -346,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     changed = False
     repaired = 0
     deleted = 0
+    skipped = 0
     failed: list[str] = []
 
     if action == "delete":
@@ -374,6 +377,9 @@ def main(argv: list[str] | None = None) -> int:
                     delete_actor(actor, args.apply)
                     deleted += 1
                     changed = changed or args.apply
+                else:
+                    skipped += 1
+                    print("   -> skipped: repair failed or no usable photos; actor left untouched")
 
             if args.delay > 0 and index < len(candidates):
                 time.sleep(args.delay)
@@ -381,6 +387,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\nSummary")
     print(f"  {'Repaired' if args.apply else 'Would repair'} actors: {repaired}")
     print(f"  Deleted actors: {deleted if args.apply else 0}")
+    print(f"  Skipped actors: {skipped}")
     print(f"  Failed repairs: {len(failed)}")
     if failed[:20]:
         print("  Failed sample:", ", ".join(failed[:20]))

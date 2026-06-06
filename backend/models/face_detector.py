@@ -90,11 +90,17 @@ class FaceDetector:
 
     def _initialize(self) -> None:
         """Initialize the insightface model."""
+        self._initialize_with_providers(self._providers)
+        if not self._model_loaded and "CPUExecutionProvider" not in self._providers:
+            self._providers = ["CPUExecutionProvider"]
+            self._initialize_with_providers(self._providers)
+
+    def _initialize_with_providers(self, providers: list[str]) -> None:
         try:
             self._app = FaceAnalysis(
                 name="antelopev2",
                 root=settings.base_dir / "models",
-                providers=self._providers,
+                providers=providers,
             )
             self._app.prepare(
                 ctx_id=0,
@@ -102,7 +108,7 @@ class FaceDetector:
                 det_size=(640, 640),
             )
             self._model_loaded = True
-            print(f"[FaceDetector] Model loaded successfully with {self._providers}")
+            print(f"[FaceDetector] Model loaded successfully with {providers}")
         except Exception as e:
             print(f"[FaceDetector] Warning: Could not load antelopev2 model: {e}")
             # Fallback to buffalo_l model
@@ -110,7 +116,7 @@ class FaceDetector:
                 self._app = FaceAnalysis(
                     name="buffalo_l",
                     root=settings.base_dir / "models",
-                    providers=self._providers,
+                    providers=providers,
                 )
                 self._app.prepare(
                     ctx_id=0,
@@ -118,7 +124,7 @@ class FaceDetector:
                     det_size=(640, 640),
                 )
                 self._model_loaded = True
-                print(f"[FaceDetector] Fallback model 'buffalo_l' loaded successfully")
+                print(f"[FaceDetector] Fallback model 'buffalo_l' loaded successfully with {providers}")
             except Exception as fallback_err:
                 print(f"[FaceDetector] Error: Could not load any face model: {fallback_err}")
                 self._model_loaded = False
@@ -143,8 +149,26 @@ class FaceDetector:
         # Convert BGR to RGB for insightface
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Get faces
-        faces = self._app.get(image_rgb)
+        try:
+            faces = self._app.get(image_rgb)
+        except Exception as exc:
+            if self._providers != ["CPUExecutionProvider"]:
+                print(f"[FaceDetector] Provider inference failed: {exc}")
+                print("[FaceDetector] Reinitializing with CPUExecutionProvider and retrying once")
+                self._providers = ["CPUExecutionProvider"]
+                self._model_loaded = False
+                self._initialize_with_providers(self._providers)
+                if self._model_loaded and self._app is not None:
+                    try:
+                        faces = self._app.get(image_rgb)
+                    except Exception as cpu_exc:
+                        self._model_loaded = False
+                        raise RuntimeError(f"Face detector CPU fallback failed: {cpu_exc}") from cpu_exc
+                else:
+                    raise RuntimeError("Face detector CPU fallback could not initialize") from exc
+            else:
+                self._model_loaded = False
+                raise RuntimeError(f"Face detector inference failed: {exc}") from exc
 
         if not faces:
             return []

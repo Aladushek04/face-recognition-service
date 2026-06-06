@@ -41,7 +41,7 @@ const TOOL_TASKS: ToolTask[] = [
     type: 'repair_empty_actor_photos',
     title: 'Repair Empty Actor Photos',
     description: 'Try StashDB photo re-downloads for actors with no local reference images.',
-    defaultArgs: ['--limit', '10', '--delay', '0', '--build-index-args', '--min-images 4'],
+    defaultArgs: ['--limit', '10', '--delay', '0'],
     allowApply: true,
   },
   {
