@@ -148,7 +148,7 @@ public partial class MainWindow : Window
                 var requestId = reqIdElement.GetString();
                 var field = fieldElement.GetString();
                 
-                var validFields = new[] { "baseDir", "actorsDir", "modelsDir", "faissIndexDir", "videosDir", "jobsDir", "logsDir" };
+                var validFields = new[] { "baseDir", "actorsDir", "modelsDir", "faissIndexDir", "videosDir" };
                 if (Array.IndexOf(validFields, field) == -1)
                 {
                     AppendLog($"[WebViewBridge] selectFolder rejected invalid field: {field}");

@@ -12,8 +12,8 @@ const DEFAULT_CONFIG: DesktopConfig = {
     modelsDir: "D:\\FaceService\\models",
     faissIndexDir: "D:\\FaceService\\data\\faiss_index",
     videosDir: "D:\\Videos",
-    jobsDir: "D:\\FaceService\\data\\jobs",
-    logsDir: "D:\\FaceService\\logs"
+    jobsDir: "",
+    logsDir: ""
   },
   backend: {
     host: "127.0.0.1",
@@ -257,8 +257,6 @@ export function SettingsPanel() {
             { key: 'modelsDir', label: 'Models Directory' },
             { key: 'faissIndexDir', label: 'FAISS Index Directory' },
             { key: 'videosDir', label: 'Videos Directory' },
-            { key: 'jobsDir', label: 'Jobs Directory' },
-            { key: 'logsDir', label: 'Logs Directory' },
           ].map((field) => (
             <div key={field.key} className="space-y-1.5">
               <label className="text-sm font-medium text-on-surface-variant">{field.label}</label>

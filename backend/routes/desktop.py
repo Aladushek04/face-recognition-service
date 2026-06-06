@@ -14,6 +14,25 @@ class DesktopConfigPayload(BaseModel):
     backend: dict
     ai: dict
 
+def _local_runtime_dirs(config_path: str) -> tuple[str, str]:
+    app_dir = os.path.dirname(config_path)
+    return (
+        os.path.join(app_dir, "data", "jobs"),
+        os.path.join(app_dir, "logs"),
+    )
+
+def _with_local_internal_dirs(config: dict, config_path: str | None) -> dict:
+    if not config_path:
+        return config
+
+    result = dict(config)
+    runtime = dict(result.get("runtime", {}))
+    jobs_dir, logs_dir = _local_runtime_dirs(config_path)
+    runtime["jobsDir"] = jobs_dir
+    runtime["logsDir"] = logs_dir
+    result["runtime"] = runtime
+    return result
+
 @router.get("/config")
 def get_config():
     if os.environ.get("DESKTOP_MODE", "false").lower() != "true":
@@ -26,7 +45,7 @@ def get_config():
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data
+        return _with_local_internal_dirs(data, config_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read config: {str(e)}")
 
@@ -90,8 +109,8 @@ def _validate_config(config: dict):
 def validate_config(payload: DesktopConfigPayload):
     if os.environ.get("DESKTOP_MODE", "false").lower() != "true":
         raise HTTPException(status_code=403, detail="Desktop mode is not enabled.")
-        
-    return _validate_config(payload.dict())
+
+    return _validate_config(_with_local_internal_dirs(payload.dict(), os.environ.get("CONFIG_PATH")))
 
 @router.post("/config/save")
 def save_config(payload: DesktopConfigPayload):
@@ -102,7 +121,7 @@ def save_config(payload: DesktopConfigPayload):
     if not config_path:
         raise HTTPException(status_code=400, detail="CONFIG_PATH not set.")
         
-    config_dict = payload.dict()
+    config_dict = _with_local_internal_dirs(payload.dict(), config_path)
     val_result = _validate_config(config_dict)
     
     if val_result["errors"]:

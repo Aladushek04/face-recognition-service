@@ -56,31 +56,8 @@ public static class DesktopConfigLoader
     {
         if (config.Runtime != null)
         {
-            if (string.IsNullOrEmpty(config.Runtime.JobsDir))
-            {
-                config.Runtime.JobsDir = AppPaths.LocalJobsDir;
-            }
-            else
-            {
-                var jobsRoot = Path.GetPathRoot(config.Runtime.JobsDir);
-                if (!string.IsNullOrEmpty(jobsRoot) && !Directory.Exists(jobsRoot))
-                {
-                    config.Runtime.JobsDir = AppPaths.LocalJobsDir;
-                }
-            }
-            
-            if (string.IsNullOrEmpty(config.Runtime.LogsDir))
-            {
-                config.Runtime.LogsDir = AppPaths.LogsPath;
-            }
-            else
-            {
-                var logsRoot = Path.GetPathRoot(config.Runtime.LogsDir);
-                if (!string.IsNullOrEmpty(logsRoot) && !Directory.Exists(logsRoot))
-                {
-                    config.Runtime.LogsDir = AppPaths.LogsPath;
-                }
-            }
+            config.Runtime.JobsDir = AppPaths.LocalJobsDir;
+            config.Runtime.LogsDir = AppPaths.LogsPath;
         }
     }
 }
