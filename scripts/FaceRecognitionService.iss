@@ -14,6 +14,9 @@ DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\FaceRecognition.Desktop.exe
 
 [Files]
+; Explicitly copy config.example.json to guarantee overwrite
+Source: "..\desktop\wpf\FaceRecognition.Desktop\bin\Release\net10.0-windows\publish\config.example.json"; DestDir: "{app}"; Flags: ignoreversion
+
 ; Copy all publish output, excluding config.json, logs, and data/jobs
 Source: "..\desktop\wpf\FaceRecognition.Desktop\bin\Release\net10.0-windows\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "config.json,logs\*,data\jobs\*"
 
