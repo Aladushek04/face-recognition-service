@@ -1,14 +1,28 @@
 [CmdletBinding()]
-Param()
+Param(
+    [string]$Version = "v1.0.1",
+    [string]$ReleaseName = "",
+    [string]$OutputRoot = "",
+    [switch]$Force = $false
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
+if ([string]::IsNullOrWhiteSpace($ReleaseName)) {
+    $ReleaseName = "FaceRecognitionService-Portable-$Version"
+}
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $OutputRoot = Join-Path $RepoRoot "releases"
+}
 
 Write-Host "--- Packaging Portable Release ---"
 Write-Host "RepoRoot: $RepoRoot"
+Write-Host "Version: $Version"
+Write-Host "ReleaseName: $ReleaseName"
+Write-Host "OutputRoot: $OutputRoot"
 
 # 1. Run publish script
 $PublishScript = Join-Path $RepoRoot "desktop\wpf\FaceRecognition.Desktop\scripts\publish-desktop.ps1"
@@ -30,19 +44,31 @@ if (-not (Test-Path $PublishOutputDir)) {
     Write-Error "Publish output directory not found: $PublishOutputDir"
 }
 
-# 3. Create releases directory
-$Version = "v1.0.0"
-$ReleaseName = "FaceRecognitionService-Portable-$Version"
-$ReleasesDir = Join-Path $RepoRoot "releases"
+# 3. Create output directory
+$ReleasesDir = $OutputRoot
 $ReleaseTargetDir = Join-Path $ReleasesDir $ReleaseName
+$ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
+$ChecksumPath = "$ZipPath.sha256"
 
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Force -Path $ReleasesDir | Out-Null
 }
 
-if (Test-Path $ReleaseTargetDir) {
-    Write-Host "Cleaning existing release directory..."
-    Remove-Item -Recurse -Force $ReleaseTargetDir
+if ((Test-Path $ReleaseTargetDir) -or (Test-Path $ZipPath) -or (Test-Path $ChecksumPath)) {
+    if (-not $Force) {
+        Write-Error "Portable output already exists. Re-run with -Force to replace exact targets: $ReleaseTargetDir, $ZipPath, $ChecksumPath"
+    }
+
+    Write-Host "Force enabled. Removing exact portable targets only..."
+    if (Test-Path $ReleaseTargetDir) {
+        Remove-Item -LiteralPath $ReleaseTargetDir -Recurse -Force
+    }
+    if (Test-Path $ZipPath) {
+        Remove-Item -LiteralPath $ZipPath -Force
+    }
+    if (Test-Path $ChecksumPath) {
+        Remove-Item -LiteralPath $ChecksumPath -Force
+    }
 }
 
 New-Item -ItemType Directory -Force -Path $ReleaseTargetDir | Out-Null
@@ -74,7 +100,7 @@ New-Item -ItemType Directory -Force -Path $TargetLogs | Out-Null
 Write-Host "Generating README.txt..."
 $ReadmePath = Join-Path $ReleaseTargetDir "README.txt"
 $ReadmeContent = @"
-Face Recognition Service - Portable Release (v1.0.0)
+Face Recognition Service - Portable Release ($Version)
 
 == How to Run ==
 1. Extract the folder to your preferred location.
@@ -108,18 +134,11 @@ Set-Content -Path $ReadmePath -Value $ReadmeContent -Encoding ASCII -Force
 Write-Host "Files copied."
 
 # 5. Create ZIP
-$ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
-if (Test-Path $ZipPath) {
-    Remove-Item -Force $ZipPath
-}
-
 Write-Host "Compressing to $ZipPath..."
 Compress-Archive -Path $ReleaseTargetDir -DestinationPath $ZipPath -CompressionLevel Optimal
 
 # 6. Generate SHA256 Checksum
 Write-Host "Generating SHA256 Checksums..."
-$ChecksumPath = Join-Path $ReleasesDir "$ReleaseName.sha256"
-
 $ZipHash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash
 "$ZipHash  $ReleaseName.zip" | Out-File -FilePath $ChecksumPath -Encoding ASCII
 
