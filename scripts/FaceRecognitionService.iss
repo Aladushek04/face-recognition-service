@@ -9,7 +9,7 @@ OutputDir=..\releases
 OutputBaseFilename=FaceRecognitionService-Setup-v1.0.0
 Compression=lzma2
 SolidCompression=yes
-SetupIconFile=..\desktop\electron\assets\app-icon.ico
+SetupIconFile=..\desktop\wpf\FaceRecognition.Desktop\Assets\app-icon.ico
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\FaceRecognition.Desktop.exe
 
