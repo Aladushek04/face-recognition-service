@@ -10,8 +10,10 @@ This is the first stable release of the Face Recognition Service. It provides lo
 - **Maintenance Center**: In-app UI for managing FAISS indexing, actor/image cleanup, and StashDB backfills as background jobs.
 
 ## 📦 File Hashes
-* **Installer**: `FaceRecognitionService-Setup-v1.0.0.exe`
+* **Validated Release Candidate**: `FaceRecognitionService-Setup-v1.0.0-813c65e.exe`
 * **SHA256**: `74EF6EA76BECD58EB54E420D2AFE9163A7EA5AC4E6247358E6856179FCC4E814`
+
+*(Note: The final public GitHub release file may be renamed to `FaceRecognitionService-Setup-v1.0.0.exe` providing it is an exact byte-for-byte copy with a confirmed SHA256 match).*
 
 ## 💻 System Requirements
 1. **Microsoft .NET 10 Desktop Runtime (x64)** (The installer will prompt you if missing).
@@ -19,7 +21,7 @@ This is the first stable release of the Face Recognition Service. It provides lo
 3. **NVIDIA GPU (Optional)**: Automatically falls back to CPU if a CUDA GPU is not available. No separate CUDA Toolkit installation is required.
 
 ## 📥 Installation Steps
-1. Download `FaceRecognitionService-Setup-v1.0.0.exe`.
+1. Download the validated installer `FaceRecognitionService-Setup-v1.0.0-813c65e.exe`.
 2. Run the executable to install the application. It will install automatically to `%LOCALAPPDATA%\Programs\Face Recognition Service`.
 3. Launch "Face Recognition Service" from your Start Menu.
 4. On your very first run, you will see a **Configuration Required** screen.
@@ -32,7 +34,7 @@ This is the first stable release of the Face Recognition Service. It provides lo
    - Models Directory: `D:\FaceService\models`
    - FAISS Index Directory: `D:\FaceService\data\faiss_index`
    - Videos Directory: `D:\Videos`
-3. Restart the application or click **Validate**.
+3. Click **Validate**. If validation succeeds, click **Save** and restart the app when prompted.
 4. The backend should successfully load and display: `Model Ready`, indicating the AI has initialized.
 
 ## 🔄 Upgrades & Uninstallation
