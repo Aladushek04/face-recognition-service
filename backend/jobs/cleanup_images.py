@@ -13,7 +13,11 @@ from jobs.runtime import configure_job_io  # noqa: E402
 configure_job_io()
 
 from database import actor_db  # noqa: E402
-from models.face_detector import FaceDetector  # noqa: E402
+from models.face_detector import FaceDetector, FaceDetectorUnavailableError  # noqa: E402
+
+
+LARGE_DELETE_COUNT_THRESHOLD = 500
+LARGE_DELETE_RATIO_THRESHOLD = 0.25
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -21,6 +25,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--apply", action="store_true", help="Actually delete files and DB rows. Default is dry-run.")
     parser.add_argument("--page-size", type=int, default=500, help="DB page size.")
     parser.add_argument("--limit", type=int, help="Stop after checking this many image rows.")
+    parser.add_argument(
+        "--max-processing-errors",
+        type=int,
+        default=10,
+        help="Abort after this many detector/processing errors.",
+    )
+    parser.add_argument(
+        "--confirm-large-delete",
+        action="store_true",
+        help="Advanced unsafe option: allow deleting large candidate sets.",
+    )
     parser.add_argument(
         "--delete-missing",
         action="store_true",
@@ -78,13 +93,17 @@ def main(argv: list[str] | None = None) -> int:
     no_usable_face = 0
     processing_errors = 0
     skipped_due_to_errors = 0
+    aborted_detector_failure = False
+    abort_reason = ""
+    total_rows = 0
 
     detector = FaceDetector()
-    if not detector.model_loaded:
-        print("ERROR: Face detector model is not loaded.")
+    if not detector.is_available:
+        print("ERROR: Face detector unavailable after CUDA/CPU fallback; aborting safe job without destructive changes.")
         return 1
 
     for image, total in iter_images(max(args.page_size, 1)):
+        total_rows = total
         if args.limit is not None and checked >= args.limit:
             break
         checked += 1
@@ -105,10 +124,23 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             usable = has_usable_face(detector, image_path, args.min_face_area_ratio)
+        except FaceDetectorUnavailableError as exc:
+            processing_errors += 1
+            skipped_due_to_errors += 1
+            aborted_detector_failure = True
+            abort_reason = str(exc)
+            print(f"  ! {label}: detector unavailable: {exc}")
+            print("Face detector unavailable after CUDA/CPU fallback; aborting safe job without destructive changes.")
+            break
         except Exception as exc:
             processing_errors += 1
             skipped_due_to_errors += 1
             print(f"  ! {label}: processing error: {exc}")
+            if processing_errors >= max(args.max_processing_errors, 1):
+                aborted_detector_failure = True
+                abort_reason = f"max processing errors reached ({processing_errors})"
+                print("Face detector unavailable after CUDA/CPU fallback; aborting safe job without destructive changes.")
+                break
             continue
 
         if usable:
@@ -127,11 +159,31 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Processing errors: {processing_errors}")
     print(f"Skipped due to errors: {skipped_due_to_errors}")
     print(f"Images matching delete criteria: {len(candidates)}")
+    print(f"Aborted due to detector failure: {'yes' if aborted_detector_failure else 'no'}")
     print("Mode:", "APPLY" if args.apply else "DRY-RUN")
+
+    if aborted_detector_failure:
+        print(f"ERROR: {abort_reason or 'detector unavailable'}")
+        print("No changes made after detector-global failure.")
+        return 1
 
     if not args.apply:
         print("No changes made. Re-run with --apply to delete.")
         return 0
+
+    candidate_count = len(candidates)
+    denominator = total_rows or checked or 1
+    candidate_ratio = candidate_count / denominator
+    if (
+        candidate_count > LARGE_DELETE_COUNT_THRESHOLD
+        or candidate_ratio > LARGE_DELETE_RATIO_THRESHOLD
+    ) and not args.confirm_large_delete:
+        print("ERROR: Refusing large cleanup delete without --confirm-large-delete")
+        print(
+            f"Candidates: {candidate_count}; total rows: {denominator}; "
+            f"ratio: {candidate_ratio:.1%}"
+        )
+        return 1
 
     deleted = 0
     for image, reason in candidates:

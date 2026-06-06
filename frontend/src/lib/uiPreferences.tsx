@@ -15,7 +15,7 @@ const translations = {
     uploadTitle: 'Identify Actors from Photos',
     uploadSubtitle:
       'Upload photos to detect faces and identify actors from the local database. All processing happens locally - your images never leave your computer.',
-    footerVersion: 'Face Recognition Service v1.0',
+    footerVersion: 'Face Recognition Service v1.0.1',
     footerPrivacy: 'All processing is local and private',
     language: 'Language',
     theme: 'Theme',
@@ -128,7 +128,7 @@ const translations = {
     uploadTitle: 'Определение актеров по фото',
     uploadSubtitle:
       'Загрузите фото, чтобы найти лица и сравнить их с локальной базой. Обработка идет локально, изображения не уходят с компьютера.',
-    footerVersion: 'Face Recognition Service v1.0',
+    footerVersion: 'Face Recognition Service v1.0.1',
     footerPrivacy: 'Вся обработка локальная и приватная',
     language: 'Язык',
     theme: 'Тема',

@@ -57,6 +57,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=settings.base_dir / "data" / "embeddings",
         help="Directory for cached .npy embedding files.",
     )
+    parser.add_argument(
+        "--force-empty-index",
+        action="store_true",
+        help="Advanced unsafe option: allow saving a 0-vector FAISS index.",
+    )
     return parser.parse_args(argv)
 
 
@@ -226,7 +231,13 @@ def main(argv: list[str] | None = None) -> int:
         print("No actors found in database. Run seed_actors.py or scrape_stashdb.py first.")
         return 1
 
-    vector_store.save_index()
+    if total_vectors == 0 and not args.force_empty_index:
+        print("ERROR: Refusing to overwrite existing FAISS index with 0 vectors. Existing index preserved.")
+        print("Use --force-empty-index only when intentionally creating an empty index.")
+        return 1
+
+    if not vector_store.save_index():
+        return 1
 
     print("-" * 50)
     print("Index built successfully!")

@@ -59,13 +59,17 @@ class VectorStore:
             return False
 
     def save_index(self) -> bool:
-        """Save FAISS index to disk."""
+        """Save FAISS index to disk with atomic replace."""
         try:
             settings.faiss_index_dir.mkdir(parents=True, exist_ok=True)
+            index_tmp = settings.faiss_index_path.with_suffix(settings.faiss_index_path.suffix + ".tmp")
+            id_map_tmp = settings.faiss_id_map_path.with_suffix(settings.faiss_id_map_path.suffix + ".tmp")
             if self._index is not None:
-                faiss.write_index(self._index, str(settings.faiss_index_path))
-            with open(settings.faiss_id_map_path, "wb") as f:
+                faiss.write_index(self._index, str(index_tmp))
+                index_tmp.replace(settings.faiss_index_path)
+            with open(id_map_tmp, "wb") as f:
                 pickle.dump(self._id_map, f)
+            id_map_tmp.replace(settings.faiss_id_map_path)
             print(f"[VectorStore] Saved index with {self.index_size} vectors")
             return True
         except Exception as e:

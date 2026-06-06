@@ -74,6 +74,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--image-order", choices=["largest", "start", "end"], default="largest")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between StashDB performers.")
     parser.add_argument("--validate-faces", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--allow-unvalidated-images",
+        action="store_true",
+        help="Advanced unsafe option: save downloaded images when face validation is unavailable.",
+    )
     parser.add_argument("--min-face-area-ratio", type=float, default=0.01)
     parser.add_argument(
         "--delete-after-failed-repair",
@@ -211,8 +216,8 @@ def download_image(url: str, path: Path) -> bool:
         return False
 
 
-def image_has_usable_face(path: Path, min_face_area_ratio: float) -> bool:
-    from models.face_detector import FaceDetector  # noqa: PLC0415
+def image_has_usable_face(path: Path, min_face_area_ratio: float, allow_unvalidated: bool = False) -> bool:
+    from models.face_detector import FaceDetector, FaceDetectorUnavailableError  # noqa: PLC0415
     import cv2  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
@@ -224,12 +229,21 @@ def image_has_usable_face(path: Path, min_face_area_ratio: float) -> bool:
     height, width = image.shape[:2]
     image_area = max(width * height, 1)
     detector = FaceDetector()
-    if not detector.model_loaded:
-        print("     face validation skipped: detector is not loaded")
-        return True
+    if not detector.is_available:
+        if allow_unvalidated:
+            print("     face validation skipped: detector is not loaded; image allowed by flag")
+            return True
+        print("     validation unavailable; image skipped")
+        return False
 
     try:
         faces = detector.detect_faces(image)
+    except FaceDetectorUnavailableError:
+        if allow_unvalidated:
+            print("     face validation skipped: detector unavailable; image allowed by flag")
+            return True
+        print("     validation unavailable; image skipped")
+        return False
     except Exception as exc:
         raise RuntimeError(f"face validation failed: {exc}") from exc
 
@@ -278,7 +292,11 @@ def repair_actor_photos(actor: dict[str, Any], args: argparse.Namespace) -> int:
         if not download_image(url, image_path):
             continue
 
-        if args.validate_faces and not image_has_usable_face(image_path, args.min_face_area_ratio):
+        if args.validate_faces and not image_has_usable_face(
+            image_path,
+            args.min_face_area_ratio,
+            args.allow_unvalidated_images,
+        ):
             image_path.unlink(missing_ok=True)
             print(f"     image {index} rejected: no usable face")
             continue

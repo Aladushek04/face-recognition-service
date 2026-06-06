@@ -14,6 +14,10 @@ except Exception:
     ort = None
 
 
+class FaceDetectorUnavailableError(RuntimeError):
+    """Raised when the face detector cannot safely run inference."""
+
+
 class FaceDetector:
     """Handles face detection and embedding extraction."""
 
@@ -31,6 +35,7 @@ class FaceDetector:
         self._providers: list[str] = self._get_execution_providers()
         self._app: FaceAnalysis | None = None
         self._model_loaded: bool = False
+        self._unavailable_reason: str | None = None
         self._initialize()
         self._model_initialized = True
 
@@ -126,12 +131,21 @@ class FaceDetector:
                 self._model_loaded = True
                 print(f"[FaceDetector] Fallback model 'buffalo_l' loaded successfully with {providers}")
             except Exception as fallback_err:
-                print(f"[FaceDetector] Error: Could not load any face model: {fallback_err}")
+                self._unavailable_reason = f"Could not load any face model: {fallback_err}"
+                print(f"[FaceDetector] Error: {self._unavailable_reason}")
                 self._model_loaded = False
 
     @property
     def model_loaded(self) -> bool:
         return self._model_loaded
+
+    @property
+    def is_available(self) -> bool:
+        return self._model_loaded and self._app is not None
+
+    @property
+    def unavailable_reason(self) -> str:
+        return self._unavailable_reason or "Face detection model not loaded"
 
     def detect_faces(self, image: np.ndarray) -> list[dict]:
         """
@@ -143,8 +157,8 @@ class FaceDetector:
         Returns:
             List of dicts with face info: bbox, embedding, confidence
         """
-        if not self._model_loaded or self._app is None:
-            raise RuntimeError("Face detection model not loaded")
+        if not self.is_available:
+            raise FaceDetectorUnavailableError(self.unavailable_reason)
 
         # Convert BGR to RGB for insightface
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -163,12 +177,15 @@ class FaceDetector:
                         faces = self._app.get(image_rgb)
                     except Exception as cpu_exc:
                         self._model_loaded = False
-                        raise RuntimeError(f"Face detector CPU fallback failed: {cpu_exc}") from cpu_exc
+                        self._unavailable_reason = f"Face detector CPU fallback failed: {cpu_exc}"
+                        raise FaceDetectorUnavailableError(self._unavailable_reason) from cpu_exc
                 else:
-                    raise RuntimeError("Face detector CPU fallback could not initialize") from exc
+                    self._unavailable_reason = "Face detector CPU fallback could not initialize"
+                    raise FaceDetectorUnavailableError(self._unavailable_reason) from exc
             else:
                 self._model_loaded = False
-                raise RuntimeError(f"Face detector inference failed: {exc}") from exc
+                self._unavailable_reason = f"Face detector inference failed: {exc}"
+                raise FaceDetectorUnavailableError(self._unavailable_reason) from exc
 
         if not faces:
             return []
