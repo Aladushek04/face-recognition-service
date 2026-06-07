@@ -57,6 +57,26 @@ hidden_imports = [
     'fastapi'
 ]
 
+gui_backend_excludes = [
+    'PyQt6',
+    'PyQt6.QtCore',
+    'PyQt6.QtGui',
+    'PyQt6.QtWidgets',
+    '_tkinter',
+    'tkinter',
+    'tcl',
+    'tk',
+    'matplotlib.backends.backend_qt',
+    'matplotlib.backends.backend_qtagg',
+    'matplotlib.backends.backend_qtcairo',
+    'matplotlib.backends.backend_qt5',
+    'matplotlib.backends.backend_qt5agg',
+    'matplotlib.backends.backend_qt5cairo',
+    'matplotlib.backends.backend_tkagg',
+    'matplotlib.backends.backend_tkcairo',
+    'matplotlib.backends.qt_compat',
+]
+
 a = Analysis(
     ['backend_main.py'],
     pathex=['.'],
@@ -64,9 +84,9 @@ a = Analysis(
     datas=[],
     hiddenimports=hidden_imports,
     hookspath=[],
-    hooksconfig={},
+    hooksconfig={'matplotlib': {'backends': 'Agg'}},
     runtime_hooks=[],
-    excludes=[],
+    excludes=gui_backend_excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
