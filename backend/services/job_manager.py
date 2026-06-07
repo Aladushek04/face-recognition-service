@@ -62,7 +62,20 @@ class JobManager:
     def list_jobs(self) -> list[dict[str, Any]]:
         if not settings.jobs_dir.exists():
             return []
-        jobs = [self._read_job(path) for path in settings.jobs_dir.glob("*.json")]
+
+        MAX_LISTED_JOBS = 100
+        paths = list(settings.jobs_dir.glob("*.json"))
+
+        def get_mtime(p: Path) -> float:
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                return 0.0
+
+        paths.sort(key=get_mtime, reverse=True)
+        recent_paths = paths[:MAX_LISTED_JOBS]
+
+        jobs = [self._read_job(path) for path in recent_paths]
         return sorted(
             (job for job in jobs if job),
             key=lambda item: float(item.get("created_at") or 0),

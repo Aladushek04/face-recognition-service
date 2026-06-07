@@ -381,6 +381,56 @@ class MaintenanceHotfixTests(unittest.TestCase):
             if sys.path[0] == str(Path("backend").resolve()):
                 sys.path.pop(0)
 
+    def test_list_jobs_limits_io_to_newest_100(self) -> None:
+        sys.path.insert(0, str(Path("backend").resolve()))
+        try:
+            job_manager_module = importlib.import_module("services.job_manager")
+            manager = job_manager_module.JobManager()
+            
+            with tempfile.TemporaryDirectory() as temp_dir:
+                jobs_dir = Path(temp_dir) / "jobs"
+                jobs_dir.mkdir(parents=True, exist_ok=True)
+                
+                with mock.patch.object(job_manager_module.settings, "jobs_dir", jobs_dir):
+                    import json
+                    import time
+                    
+                    # Create 150 dummy job files with staggered mtimes
+                    for i in range(150):
+                        job_id = f"dummy_job_{i:03d}"
+                        path = jobs_dir / f"{job_id}.json"
+                        # include created_at to verify sorting
+                        path.write_text(json.dumps({"id": job_id, "created_at": i}), encoding="utf-8")
+                        # Set mtime where file 149 is the newest, 0 is the oldest
+                        os.utime(path, (time.time(), time.time() + i))
+                        
+                    # Also write a file that isn't .json to make sure it's ignored
+                    (jobs_dir / "ignored.txt").write_text("ignore")
+
+                    # Mock _read_job to track how many files are actually read
+                    original_read = manager._read_job
+                    read_count = 0
+                    def tracking_read_job(path):
+                        nonlocal read_count
+                        read_count += 1
+                        return original_read(path)
+                        
+                    with mock.patch.object(manager, "_read_job", side_effect=tracking_read_job):
+                        jobs = manager.list_jobs()
+                        
+                    # Should only parse the MAX_LISTED_JOBS limit
+                    self.assertEqual(read_count, 100)
+                    self.assertEqual(len(jobs), 100)
+                    
+                    # Should be the newest 100 (ids 050 to 149)
+                    # Because we set created_at = i and list_jobs sorts by created_at descending,
+                    # jobs[0] should be dummy_job_149
+                    self.assertEqual(jobs[0]["id"], "dummy_job_149")
+                    self.assertEqual(jobs[-1]["id"], "dummy_job_050")
+        finally:
+            if sys.path[0] == str(Path("backend").resolve()):
+                sys.path.pop(0)
+
 
 if __name__ == "__main__":
     unittest.main()
