@@ -1,6 +1,7 @@
 [Setup]
 AppName=Face Recognition Service
 AppVersion=1.0.1
+MinVersion=10.0.22000
 DefaultDirName={localappdata}\Programs\Face Recognition Service
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
