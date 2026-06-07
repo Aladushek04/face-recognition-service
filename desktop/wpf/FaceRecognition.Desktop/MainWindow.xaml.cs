@@ -106,21 +106,27 @@ public partial class MainWindow : Window
 
         cancelAction();
 
+        if (IsSafeExternalUri(uriString))
+        {
+            try 
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = uriString,
+                    UseShellExecute = true
+                });
+            } 
+            catch { }
+        }
+    }
+
+    internal static bool IsSafeExternalUri(string uriString)
+    {
         if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
         {
-            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-            {
-                try 
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = uri.AbsoluteUri,
-                        UseShellExecute = true
-                    });
-                } 
-                catch { }
-            }
+            return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
         }
+        return false;
     }
 
     private void AppendLog(string message)

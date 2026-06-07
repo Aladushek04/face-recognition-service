@@ -52,7 +52,7 @@ public static class DesktopConfigLoader
         return defaultConfig;
     }
 
-    private static void ValidateAndFallbackPaths(DesktopConfig config)
+    internal static void ValidateAndFallbackPaths(DesktopConfig config)
     {
         if (config.Runtime != null)
         {

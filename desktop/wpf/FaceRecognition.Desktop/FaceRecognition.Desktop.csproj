@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2420.47" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="FaceRecognition.Desktop.Tests" />
+  </ItemGroup>
+
 </Project>

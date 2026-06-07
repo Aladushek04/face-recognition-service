@@ -64,23 +64,7 @@ public sealed class BackendProcessManager
         File.AppendAllText(_logFile, $"Runtime baseDir: {_config.Runtime.BaseDir}\n");
         File.AppendAllText(_logFile, $"Selected backend port: {port}\n");
 
-        psi.Environment["HOST"] = "127.0.0.1";
-        psi.Environment["PORT"] = port.ToString();
-        psi.Environment["DESKTOP_MODE"] = "true";
-        psi.Environment["PYTHONIOENCODING"] = "utf-8";
-        
-        psi.Environment["CONFIG_PATH"] = AppPaths.ConfigPath;
-        psi.Environment["BASE_DIR"] = _config.Runtime.BaseDir;
-        psi.Environment["ACTORS_DIR"] = _config.Runtime.ActorsDir;
-        psi.Environment["MODELS_DIR"] = _config.Runtime.ModelsDir;
-        psi.Environment["FAISS_INDEX_DIR"] = _config.Runtime.FaissIndexDir;
-        psi.Environment["VIDEOS_DIR"] = _config.Runtime.VideosDir;
-        psi.Environment["JOBS_DIR"] = _config.Runtime.JobsDir;
-        psi.Environment["LOGS_DIR"] = _config.Runtime.LogsDir;
-        
-        psi.Environment["CORS_ORIGINS"] = JsonSerializer.Serialize(_config.Backend.CorsOrigins);
-        psi.Environment["FACE_EXECUTION_PROVIDERS"] = JsonSerializer.Serialize(_config.Ai.FaceExecutionProviders);
-        psi.Environment["FACE_MODEL_NAME"] = _config.Ai.FaceModelName;
+        ConfigureEnvironment(psi, _config, port);
 
         _process = Process.Start(psi) 
             ?? throw new InvalidOperationException("Could not start backend process.");
@@ -196,5 +180,26 @@ public sealed class BackendProcessManager
             } 
             catch { /* ignore */ }
         }
+    }
+
+    internal void ConfigureEnvironment(ProcessStartInfo psi, DesktopConfig config, int port)
+    {
+        psi.Environment["HOST"] = "127.0.0.1";
+        psi.Environment["PORT"] = port.ToString();
+        psi.Environment["DESKTOP_MODE"] = "true";
+        psi.Environment["PYTHONIOENCODING"] = "utf-8";
+        
+        psi.Environment["CONFIG_PATH"] = AppPaths.ConfigPath;
+        psi.Environment["BASE_DIR"] = config.Runtime.BaseDir;
+        psi.Environment["ACTORS_DIR"] = config.Runtime.ActorsDir;
+        psi.Environment["MODELS_DIR"] = config.Runtime.ModelsDir;
+        psi.Environment["FAISS_INDEX_DIR"] = config.Runtime.FaissIndexDir;
+        psi.Environment["VIDEOS_DIR"] = config.Runtime.VideosDir;
+        psi.Environment["JOBS_DIR"] = config.Runtime.JobsDir;
+        psi.Environment["LOGS_DIR"] = config.Runtime.LogsDir;
+        
+        psi.Environment["CORS_ORIGINS"] = JsonSerializer.Serialize(config.Backend.CorsOrigins);
+        psi.Environment["FACE_EXECUTION_PROVIDERS"] = JsonSerializer.Serialize(config.Ai.FaceExecutionProviders);
+        psi.Environment["FACE_MODEL_NAME"] = config.Ai.FaceModelName;
     }
 }
