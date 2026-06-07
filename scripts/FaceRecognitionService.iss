@@ -1,13 +1,25 @@
+#ifndef AppVersion
+#define AppVersion "1.0.2"
+#endif
+
+#ifndef OutputBaseFilename
+#define OutputBaseFilename "FaceRecognitionService-Setup-v1.0.2-cpu"
+#endif
+
+#ifndef PackageRuntime
+#define PackageRuntime "cpu"
+#endif
+
 [Setup]
 AppName=Face Recognition Service
-AppVersion=1.0.2
+AppVersion={#AppVersion}
 MinVersion=10.0.22000
 DefaultDirName={localappdata}\Programs\Face Recognition Service
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 OutputDir=..\releases
-OutputBaseFilename=FaceRecognitionService-Setup-v1.0.2
+OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma2
 SolidCompression=yes
 SetupIconFile=..\desktop\wpf\FaceRecognition.Desktop\Assets\app-icon.ico

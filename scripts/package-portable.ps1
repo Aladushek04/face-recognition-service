@@ -1,9 +1,12 @@
 [CmdletBinding()]
 Param(
+    [ValidateSet("cpu", "gpu")]
+    [string]$Runtime = "cpu",
     [string]$Version = "v1.0.2",
     [string]$ReleaseName = "",
     [string]$OutputRoot = "",
-    [switch]$Force = $false
+    [switch]$Force = $false,
+    [switch]$DryRun = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,8 +14,24 @@ Set-StrictMode -Version Latest
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
+
+$Version = $Version.Trim()
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    Write-Error "Version must not be empty."
+}
+if (-not $Version.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
+    $Version = "v$Version"
+}
+
 if ([string]::IsNullOrWhiteSpace($ReleaseName)) {
-    $ReleaseName = "FaceRecognitionService-Portable-$Version"
+    $ReleaseName = "FaceRecognitionService-Portable-$Version-$Runtime"
+} elseif ($ReleaseName -match '-(cpu|gpu)$') {
+    $ReleaseNameRuntime = $Matches[1]
+    if ($ReleaseNameRuntime -ne $Runtime) {
+        Write-Error "ReleaseName runtime suffix '$ReleaseNameRuntime' does not match selected runtime '$Runtime'."
+    }
+} else {
+    $ReleaseName = "$ReleaseName-$Runtime"
 }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $RepoRoot "releases"
@@ -20,6 +39,7 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 
 Write-Host "--- Packaging Portable Release ---"
 Write-Host "RepoRoot: $RepoRoot"
+Write-Host "Runtime: $Runtime"
 Write-Host "Version: $Version"
 Write-Host "ReleaseName: $ReleaseName"
 Write-Host "OutputRoot: $OutputRoot"
@@ -30,17 +50,11 @@ if (-not (Test-Path $BuildBackendScript)) {
     Write-Error "Backend build script not found: $BuildBackendScript"
 }
 
-Write-Host "Running build-backend.ps1..."
-& $BuildBackendScript
-
 # 2. Run publish script
 $PublishScript = Join-Path $RepoRoot "desktop\wpf\FaceRecognition.Desktop\scripts\publish-desktop.ps1"
 if (-not (Test-Path $PublishScript)) {
     Write-Error "Publish script not found: $PublishScript"
 }
-
-Write-Host "Running publish-desktop.ps1 -IncludeBackend..."
-& $PublishScript -IncludeBackend
 
 # 3. Determine publish output directory
 $WpfDir = Join-Path $RepoRoot "desktop\wpf\FaceRecognition.Desktop"
@@ -49,15 +63,40 @@ $TargetFramework = ([xml](Get-Content $CsprojPath)).Project.PropertyGroup.Target
 if (-not $TargetFramework) { $TargetFramework = "net10.0-windows" }
 $PublishOutputDir = Join-Path $WpfDir "bin\Release\$TargetFramework\publish"
 
-if (-not (Test-Path $PublishOutputDir)) {
-    Write-Error "Publish output directory not found: $PublishOutputDir"
-}
-
 # 4. Create output directory
 $ReleasesDir = $OutputRoot
 $ReleaseTargetDir = Join-Path $ReleasesDir $ReleaseName
 $ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
 $ChecksumPath = "$ZipPath.sha256"
+
+if ($DryRun) {
+    Write-Host "--- Dry Run: no files will be created and no build commands will run ---"
+    Write-Host "Backend build: powershell -ExecutionPolicy Bypass -File `"$BuildBackendScript`" -Runtime $Runtime"
+    Write-Host "Desktop publish: powershell -ExecutionPolicy Bypass -File `"$PublishScript`" -IncludeBackend"
+    Write-Host "Publish output: $PublishOutputDir"
+    Write-Host "Release directory: $ReleaseTargetDir"
+    Write-Host "ZIP archive: $ZipPath"
+    Write-Host "Checksum file: $ChecksumPath"
+    exit 0
+}
+
+Write-Host "Running build-backend.ps1 for '$Runtime' runtime..."
+& $BuildBackendScript -Runtime $Runtime
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "build-backend.ps1 failed."
+    exit $LASTEXITCODE
+}
+
+Write-Host "Running publish-desktop.ps1 -IncludeBackend..."
+& $PublishScript -IncludeBackend
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "publish-desktop.ps1 failed."
+    exit $LASTEXITCODE
+}
+
+if (-not (Test-Path $PublishOutputDir)) {
+    Write-Error "Publish output directory not found: $PublishOutputDir"
+}
 
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Force -Path $ReleasesDir | Out-Null
@@ -110,6 +149,7 @@ Write-Host "Generating README.txt..."
 $ReadmePath = Join-Path $ReleaseTargetDir "README.txt"
 $ReadmeContent = @"
 Face Recognition Service - Portable Release ($Version)
+Runtime channel: $Runtime
 
 == How to Run ==
 1. Extract the folder to your preferred location.
@@ -131,8 +171,9 @@ This portable release does NOT bundle user data or models. You must provide:
 == System Requirements ==
 1. .NET 10 Desktop Runtime: This release is Framework-Dependent. You MUST install the Microsoft .NET 10 Desktop Runtime (x64) to launch the shell.
 2. WebView2 Runtime: Required to render the UI. (Pre-installed on Windows 11).
-3. NVIDIA GPU (Optional but highly recommended): The backend supports CUDAExecutionProvider. Ensure you have the latest NVIDIA drivers installed.
-   - CPU Fallback: If no compatible GPU/CUDA driver is found, the backend will automatically fallback to CPUExecutionProvider (which is significantly slower).
+3. Runtime channel:
+   - CPU package: Default recommended package for most users. No NVIDIA GPU is required.
+   - GPU package: NVIDIA-accelerated package for CUDAExecutionProvider. Install current NVIDIA drivers. If no compatible GPU/CUDA driver is found, the backend falls back to CPUExecutionProvider.
 
 == Logs & Diagnostics ==
 Application logs are stored in the "logs/" folder next to the executable.
