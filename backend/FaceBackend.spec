@@ -2,9 +2,18 @@
 
 import os
 import glob
+import site
+
+backend_runtime = os.environ.get('FACE_BACKEND_RUNTIME', 'gpu').strip().lower()
+if backend_runtime not in {'cpu', 'gpu'}:
+    raise ValueError(f"FACE_BACKEND_RUNTIME must be 'cpu' or 'gpu', got {backend_runtime!r}")
 
 # Resolve DLLs
-site_packages = r'C:\Users\isoko\AppData\Local\Programs\Python\Python310\lib\site-packages'
+site_package_dirs = []
+for candidate in site.getsitepackages() + [site.getusersitepackages()]:
+    if candidate and os.path.isdir(candidate) and candidate not in site_package_dirs:
+        site_package_dirs.append(candidate)
+
 required_dlls = [
     'cudnn64_9.dll',
     'cudnn_engines_runtime_compiled64_9.dll',
@@ -17,9 +26,11 @@ required_dlls = [
 ]
 
 extra_binaries = []
-all_nvidia_dlls = glob.glob(os.path.join(site_packages, 'nvidia', '**', 'bin', '*.dll'), recursive=True)
-all_onnx_dlls = glob.glob(os.path.join(site_packages, 'onnxruntime', 'capi', '*.dll'))
-all_dlls = all_nvidia_dlls + all_onnx_dlls
+all_dlls = []
+if backend_runtime == 'gpu':
+    for site_packages in site_package_dirs:
+        all_dlls.extend(glob.glob(os.path.join(site_packages, 'nvidia', '**', 'bin', '*.dll'), recursive=True))
+        all_dlls.extend(glob.glob(os.path.join(site_packages, 'onnxruntime', 'capi', '*.dll')))
 
 for dll in all_dlls:
     if os.path.basename(dll) in required_dlls:
@@ -77,6 +88,15 @@ gui_backend_excludes = [
     'matplotlib.backends.qt_compat',
 ]
 
+runtime_excludes = []
+if backend_runtime == 'cpu':
+    runtime_excludes = [
+        'nvidia',
+        'nvidia.cublas',
+        'nvidia.cuda_runtime',
+        'nvidia.cudnn',
+    ]
+
 a = Analysis(
     ['backend_main.py'],
     pathex=['.'],
@@ -86,34 +106,46 @@ a = Analysis(
     hookspath=[],
     hooksconfig={'matplotlib': {'backends': 'Agg'}},
     runtime_hooks=[],
-    excludes=gui_backend_excludes,
+    excludes=gui_backend_excludes + runtime_excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
 
-package_collected_dlls = {
-    'nvidia\\cublas\\bin\\cublaslt64_12.dll',
-    'nvidia\\cudnn\\bin\\cudnn_graph64_9.dll',
-    'nvidia\\cudnn\\bin\\cudnn_ops64_9.dll',
-    'onnxruntime\\capi\\onnxruntime_providers_cuda.dll',
-    'onnxruntime\\capi\\onnxruntime_providers_shared.dll',
-}
-collected_targets = {
-    target.replace('/', '\\').lower()
-    for target, _, _ in a.binaries
-}
-root_duplicate_dlls = {
-    target.rsplit('\\', 1)[-1]
-    for target in package_collected_dlls
-    if target in collected_targets
-}
-a.binaries = [
-    binary
-    for binary in a.binaries
-    if binary[0].replace('/', '\\').lower() not in root_duplicate_dlls
-]
+if backend_runtime == 'gpu':
+    package_collected_dlls = {
+        'nvidia\\cublas\\bin\\cublaslt64_12.dll',
+        'nvidia\\cudnn\\bin\\cudnn_graph64_9.dll',
+        'nvidia\\cudnn\\bin\\cudnn_ops64_9.dll',
+        'onnxruntime\\capi\\onnxruntime_providers_cuda.dll',
+        'onnxruntime\\capi\\onnxruntime_providers_shared.dll',
+    }
+    collected_targets = {
+        target.replace('/', '\\').lower()
+        for target, _, _ in a.binaries
+    }
+    root_duplicate_dlls = {
+        target.rsplit('\\', 1)[-1]
+        for target in package_collected_dlls
+        if target in collected_targets
+    }
+    a.binaries = [
+        binary
+        for binary in a.binaries
+        if binary[0].replace('/', '\\').lower() not in root_duplicate_dlls
+    ]
+else:
+    cuda_binary_markers = (
+        'nvidia\\',
+        'onnxruntime\\capi\\onnxruntime_providers_cuda.dll',
+        'onnxruntime\\capi\\onnxruntime_providers_tensorrt.dll',
+    )
+    a.binaries = [
+        binary
+        for binary in a.binaries
+        if not any(binary[0].replace('/', '\\').lower().startswith(marker) for marker in cuda_binary_markers)
+    ]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

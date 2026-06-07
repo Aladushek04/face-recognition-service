@@ -1,6 +1,4 @@
-# Face Recognition Service - Backend Dependencies
-# Default developer/runtime profile: GPU.
-# CPU builds use requirements-cpu.txt; GPU builds use requirements-gpu.txt.
+# Face Recognition Service - GPU Backend Dependencies
 
 # Core web framework
 fastapi==0.115.6
@@ -19,7 +17,7 @@ Pillow==11.0.0
 # Vector search
 faiss-cpu==1.9.0
 
-# Database (sqlite3 is built into Python — no pip install needed)
+# Database (sqlite3 is built into Python - no pip install needed)
 
 # Utilities
 python-dotenv==1.0.1
