@@ -85,6 +85,11 @@ describe('MaintenancePanel Safety Controls', () => {
     // Verify confirm was called
     expect(window.confirm).toHaveBeenCalled()
 
+    // Wait for the final API call to complete to prevent act() warnings from late state updates
+    await waitFor(() => {
+      expect(api.getToolJobLogs).toHaveBeenCalledWith('test-job', expect.any(Number))
+    })
+
     // Verify startToolJob WAS called because we confirmed
     expect(api.startToolJob).toHaveBeenCalledWith('cleanup_actors', expect.objectContaining({ apply: true }))
   })
