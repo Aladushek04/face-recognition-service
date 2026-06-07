@@ -365,17 +365,18 @@ class MaintenanceHotfixTests(unittest.TestCase):
     def test_api_rejects_unsafe_user_args_with_400(self) -> None:
         sys.path.insert(0, str(Path("backend").resolve()))
         try:
-            from routes.tools import start_job, JobStartRequest
-            from fastapi import HTTPException
+            from main import app
+            from fastapi.testclient import TestClient
 
-            request = JobStartRequest(apply=False, args=["--apply", "--confirm-large-delete"], env={})
+            client = TestClient(app, base_url="http://127.0.0.1:8000")
+            response = client.post(
+                "/api/tools/jobs/cleanup_images",
+                json={"apply": False, "args": ["--apply", "--confirm-large-delete"], "env": {}}
+            )
 
-            with self.assertRaises(HTTPException) as ctx:
-                start_job(job_type="cleanup_images", request=request)
-
-            self.assertEqual(ctx.exception.status_code, 400)
-            self.assertIn("Dangerous argument", ctx.exception.detail)
-            self.assertIn("--apply", ctx.exception.detail)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("Dangerous argument", response.json()["detail"])
+            self.assertIn("--apply", response.json()["detail"])
         finally:
             if sys.path[0] == str(Path("backend").resolve()):
                 sys.path.pop(0)
