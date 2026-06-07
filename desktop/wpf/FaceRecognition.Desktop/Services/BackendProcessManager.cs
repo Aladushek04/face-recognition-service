@@ -149,7 +149,7 @@ public sealed class BackendProcessManager
             {
                 // Ignore connection errors while waiting
             }
-            await Task.Delay(1000);
+            await Task.Delay(150);
         }
         throw new TimeoutException("Backend health check timed out after 90 seconds.");
     }

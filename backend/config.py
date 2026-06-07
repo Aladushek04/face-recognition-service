@@ -1,7 +1,7 @@
 """Application configuration."""
 
 import sys
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from pathlib import Path
 
@@ -107,11 +107,12 @@ class Settings(BaseSettings):
     stashdb_api_url: str = "https://stashdb.org/graphql"
     stashdb_api_key: str = ""
 
-    class Config:
-        env_file = get_env_file()
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=get_env_file(),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
 
 
 settings = Settings()
