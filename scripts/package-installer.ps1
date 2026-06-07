@@ -5,7 +5,8 @@ param (
     [string]$Version = "v1.0.3",
     [string]$OutputDir = "",
     [switch]$NoBuild = $false,
-    [switch]$DryRun = $false
+    [switch]$DryRun = $false,
+    [switch]$ReleaseOutput = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,12 +25,8 @@ if ($CustomOutputDir) {
 } else {
     $ResolvedOutputDir = $DefaultOutputDir
 }
-
-$ForbiddenInstallerDir = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller")
-if ($ResolvedOutputDir.Equals($ForbiddenInstallerDir, [System.StringComparison]::OrdinalIgnoreCase) -or
-    $ResolvedOutputDir.StartsWith("$ForbiddenInstallerDir\", [System.StringComparison]::OrdinalIgnoreCase)) {
-    Write-Error "Refusing to write packaging output to protected release directory: $ForbiddenInstallerDir"
-}
+$PathTrimChars = [char[]]"\/"
+$ResolvedOutputDir = $ResolvedOutputDir.TrimEnd($PathTrimChars)
 
 $VersionLabel = $Version.Trim()
 if ([string]::IsNullOrWhiteSpace($VersionLabel)) {
@@ -40,6 +37,29 @@ if ($VersionLabel.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase))
 } else {
     $AppVersion = $VersionLabel
     $VersionLabel = "v$VersionLabel"
+}
+
+$ProtectedReleaseRoot = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller").TrimEnd($PathTrimChars)
+$IsProtectedReleaseRoot = $ResolvedOutputDir.Equals($ProtectedReleaseRoot, [System.StringComparison]::OrdinalIgnoreCase)
+$IsUnderProtectedReleaseRoot = $ResolvedOutputDir.StartsWith("$ProtectedReleaseRoot\", [System.StringComparison]::OrdinalIgnoreCase)
+
+if ($IsProtectedReleaseRoot) {
+    Write-Error "Refusing to write directly to protected release root: $ProtectedReleaseRoot. Use a version-scoped subfolder named $VersionLabel with -ReleaseOutput."
+}
+
+if ($IsUnderProtectedReleaseRoot) {
+    if (-not $ReleaseOutput) {
+        Write-Error "Refusing to write under protected release root without -ReleaseOutput: $ResolvedOutputDir"
+    }
+
+    $OutputParent = (Split-Path -Parent $ResolvedOutputDir).TrimEnd($PathTrimChars)
+    $OutputLeaf = Split-Path -Leaf $ResolvedOutputDir
+    if (-not $OutputParent.Equals($ProtectedReleaseRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Error "Release output must be a direct version-scoped subfolder of $ProtectedReleaseRoot, got: $ResolvedOutputDir"
+    }
+    if (-not $OutputLeaf.Equals($VersionLabel, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Error "Release output folder name '$OutputLeaf' must match requested version '$VersionLabel'."
+    }
 }
 
 $OutputBaseFilename = "FaceRecognitionService-Setup-$VersionLabel-$Runtime"
@@ -61,8 +81,13 @@ Write-Host "Runtime: $Runtime"
 Write-Host "Version: $VersionLabel"
 Write-Host "AppVersion: $AppVersion"
 Write-Host "OutputDir: $ResolvedOutputDir"
+Write-Host "ReleaseOutput: $($ReleaseOutput.IsPresent)"
 Write-Host "OutputBaseFilename: $OutputBaseFilename"
 Write-Host "Expected installer: $ExpectedInstallerPath"
+
+if ($CustomOutputDir -and (Test-Path $ExpectedInstallerPath)) {
+    Write-Error "Installer output already exists. Refusing to overwrite: $ExpectedInstallerPath"
+}
 
 if ($DryRun) {
     Write-Host "--- Dry Run: no files will be created and no build commands will run ---"
@@ -75,10 +100,6 @@ if ($DryRun) {
     }
     Write-Host "Inno compile: ISCC $($InnoCompileArgs -join ' ') `"$IssScript`""
     exit 0
-}
-
-if ($CustomOutputDir -and (Test-Path $ExpectedInstallerPath)) {
-    Write-Error "Installer output already exists. Refusing to overwrite: $ExpectedInstallerPath"
 }
 
 # Ensure output directory exists

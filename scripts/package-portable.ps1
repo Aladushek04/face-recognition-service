@@ -7,7 +7,8 @@ Param(
     [string]$OutputDir = "",
     [string]$OutputRoot = "",
     [switch]$Force = $false,
-    [switch]$DryRun = $false
+    [switch]$DryRun = $false,
+    [switch]$ReleaseOutput = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,11 +46,30 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 } else {
     $ResolvedOutputDir = [System.IO.Path]::GetFullPath($OutputRoot)
 }
+$PathTrimChars = [char[]]"\/"
+$ResolvedOutputDir = $ResolvedOutputDir.TrimEnd($PathTrimChars)
 
-$ForbiddenInstallerDir = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller")
-if ($ResolvedOutputDir.Equals($ForbiddenInstallerDir, [System.StringComparison]::OrdinalIgnoreCase) -or
-    $ResolvedOutputDir.StartsWith("$ForbiddenInstallerDir\", [System.StringComparison]::OrdinalIgnoreCase)) {
-    Write-Error "Refusing to write packaging output to protected release directory: $ForbiddenInstallerDir"
+$ProtectedReleaseRoot = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller").TrimEnd($PathTrimChars)
+$IsProtectedReleaseRoot = $ResolvedOutputDir.Equals($ProtectedReleaseRoot, [System.StringComparison]::OrdinalIgnoreCase)
+$IsUnderProtectedReleaseRoot = $ResolvedOutputDir.StartsWith("$ProtectedReleaseRoot\", [System.StringComparison]::OrdinalIgnoreCase)
+
+if ($IsProtectedReleaseRoot) {
+    Write-Error "Refusing to write directly to protected release root: $ProtectedReleaseRoot. Use a version-scoped subfolder named $Version with -ReleaseOutput."
+}
+
+if ($IsUnderProtectedReleaseRoot) {
+    if (-not $ReleaseOutput) {
+        Write-Error "Refusing to write under protected release root without -ReleaseOutput: $ResolvedOutputDir"
+    }
+
+    $OutputParent = (Split-Path -Parent $ResolvedOutputDir).TrimEnd($PathTrimChars)
+    $OutputLeaf = Split-Path -Leaf $ResolvedOutputDir
+    if (-not $OutputParent.Equals($ProtectedReleaseRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Error "Release output must be a direct version-scoped subfolder of $ProtectedReleaseRoot, got: $ResolvedOutputDir"
+    }
+    if (-not $OutputLeaf.Equals($Version, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Error "Release output folder name '$OutputLeaf' must match requested version '$Version'."
+    }
 }
 
 Write-Host "--- Packaging Portable Release ---"
@@ -58,6 +78,7 @@ Write-Host "Runtime: $Runtime"
 Write-Host "Version: $Version"
 Write-Host "ReleaseName: $ReleaseName"
 Write-Host "OutputDir: $ResolvedOutputDir"
+Write-Host "ReleaseOutput: $($ReleaseOutput.IsPresent)"
 
 # 1. Build packaged backend
 $BuildBackendScript = Join-Path $RepoRoot "scripts\build-backend.ps1"
@@ -83,6 +104,16 @@ $ReleasesDir = $ResolvedOutputDir
 $ReleaseTargetDir = Join-Path $ReleasesDir $ReleaseName
 $ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
 $ChecksumPath = "$ZipPath.sha256"
+
+if ((Test-Path $ReleaseTargetDir) -or (Test-Path $ZipPath) -or (Test-Path $ChecksumPath)) {
+    if ($ReleaseOutput) {
+        Write-Error "Portable output already exists in release output. Refusing to overwrite: $ReleaseTargetDir, $ZipPath, $ChecksumPath"
+    }
+
+    if (-not $Force -and -not $DryRun) {
+        Write-Error "Portable output already exists. Re-run with -Force to replace exact targets: $ReleaseTargetDir, $ZipPath, $ChecksumPath"
+    }
+}
 
 if ($DryRun) {
     Write-Host "--- Dry Run: no files will be created and no build commands will run ---"
@@ -118,10 +149,6 @@ if (-not (Test-Path $ReleasesDir)) {
 }
 
 if ((Test-Path $ReleaseTargetDir) -or (Test-Path $ZipPath) -or (Test-Path $ChecksumPath)) {
-    if (-not $Force) {
-        Write-Error "Portable output already exists. Re-run with -Force to replace exact targets: $ReleaseTargetDir, $ZipPath, $ChecksumPath"
-    }
-
     Write-Host "Force enabled. Removing exact portable targets only..."
     if (Test-Path $ReleaseTargetDir) {
         Remove-Item -LiteralPath $ReleaseTargetDir -Recurse -Force
