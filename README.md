@@ -11,13 +11,17 @@ A local service for facial recognition of actors in photos and videos. The datab
 
 ## 📥 Installation
 
-1. Download the latest release artifact (e.g., `FaceRecognitionService-Setup-v1.0.0-rc1.exe` or the final renamed `FaceRecognitionService-Setup-v1.0.0.exe`) from the Releases page.
-2. Ensure you have the required runtimes installed (the installer will automatically prompt you if they are missing):
+1. Download the latest installer from the Releases page.
+   - Recommended for most users: `FaceRecognitionService-Setup-v1.0.3-cpu.exe`
+   - Optional NVIDIA acceleration: `FaceRecognitionService-Setup-v1.0.3-gpu.exe`
+2. Use the CPU installer unless you specifically want NVIDIA GPU acceleration. The CPU installer is much smaller and does not require CUDA or NVIDIA runtime files.
+3. Windows 11 is required. Windows 10 and older are not supported.
+4. Ensure you have the required runtimes installed (the installer will automatically prompt you if they are missing):
    - **Microsoft .NET 10 Desktop Runtime (x64)**
    - **Microsoft Edge WebView2 Runtime**
-3. Run the setup executable. The application will install per-user into `%LOCALAPPDATA%\Programs\Face Recognition Service`.
-4. Launch the application from your Start Menu.
-5. On your first launch, the app will display a **Configuration Required** screen.
+5. Run the setup executable. The application will install per-user into `%LOCALAPPDATA%\Programs\Face Recognition Service`.
+6. Launch the application from your Start Menu.
+7. On your first launch, the app will display a **Configuration Required** screen.
 
 > **Note**: No Python environment, Node.js, or source repository is required on the user machine. The backend runs completely bundled as `FaceBackend.exe`. The app cleanly manages its child processes and leaves no orphans when closed.
 

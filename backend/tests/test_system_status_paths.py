@@ -96,7 +96,7 @@ class SystemStatusPathTests(unittest.TestCase):
                 self.assertEqual(paths["logs_dir"]["path"], str(logs_dir))
                 self.assertNotEqual(paths["jobs_dir"]["path"], str(external_base / "data" / "jobs"))
                 self.assertNotEqual(paths["logs_dir"]["path"], str(external_base / "logs"))
-                self.assertEqual(payload["service"]["version"], "1.0.2")
+                self.assertEqual(payload["service"]["version"], "1.0.3")
         finally:
             if sys.path and sys.path[0] == str(Path("backend").resolve()):
                 sys.path.pop(0)

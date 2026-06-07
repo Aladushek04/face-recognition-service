@@ -2,7 +2,7 @@
 param (
     [ValidateSet("cpu", "gpu")]
     [string]$Runtime = "cpu",
-    [string]$Version = "v1.0.2",
+    [string]$Version = "v1.0.3",
     [string]$OutputDir = "",
     [switch]$NoBuild = $false,
     [switch]$DryRun = $false

@@ -2,7 +2,7 @@
 Param(
     [ValidateSet("cpu", "gpu")]
     [string]$Runtime = "cpu",
-    [string]$Version = "v1.0.2",
+    [string]$Version = "v1.0.3",
     [string]$ReleaseName = "",
     [string]$OutputDir = "",
     [string]$OutputRoot = "",

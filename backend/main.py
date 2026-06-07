@@ -63,7 +63,7 @@ _index_rebuild_lock = threading.Lock()
 app = FastAPI(
     title="Face Recognition Service",
     description="Local self-hosted face recognition for actor/actress identification",
-    version="1.0.2",
+    version="1.0.3",
     docs_url="/docs",
     redoc_url="/redoc",
 )

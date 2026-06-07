@@ -1,9 +1,9 @@
 #ifndef AppVersion
-#define AppVersion "1.0.2"
+#define AppVersion "1.0.3"
 #endif
 
 #ifndef OutputBaseFilename
-#define OutputBaseFilename "FaceRecognitionService-Setup-v1.0.2-cpu"
+#define OutputBaseFilename "FaceRecognitionService-Setup-v1.0.3-cpu"
 #endif
 
 #ifndef PackageRuntime
