@@ -1,54 +1,55 @@
-# Face Recognition Service v1.0.0 (First Stable Release)
+# v1.0.2 — Security, stability and test foundation update
 
-This is the first stable release of the Face Recognition Service. It provides local offline face recognition and actor matching using InsightFace, FAISS, and a standalone desktop React UI.
+**Tag**: `v1.0.2`  
+**Target**: `main`
 
-## 🚀 Key Features
-- **Local Desktop UI**: Embedded Chromium shell via WebView2.
-- **Offline ML**: Bundled hidden PyInstaller FastAPI backend with GPU (CUDA) and CPU support.
-- **Smart Directory Management**: Writable configurations, jobs, and logs are kept in safe local paths, while massive ML data and video files reside on user-defined drives.
-- **Safe Setup Mode**: Installer starts the app with safe, empty defaults that require manual first-run configuration.
-- **Maintenance Center**: In-app UI for managing FAISS indexing, actor/image cleanup, and StashDB backfills as background jobs.
+This patch release provides significant security hardening, robust safety optimizations, and complete test foundations for both desktop and frontend environments. It also finalizes our strict target OS policy by stripping outdated legacy compatibility layers.
 
-## 📦 File Hashes
-* **Validated Release Candidate**: `FaceRecognitionService-Setup-v1.0.0-rc1.exe`
-* **SHA256**: `74EF6EA76BECD58EB54E420D2AFE9163A7EA5AC4E6247358E6856179FCC4E814`
+## 1. Security hardening
+* **WebView2 External Navigation**: Hardened the desktop shell to block external navigation, strictly limiting interactions to local boundaries.
+* **Backend Host Binding**: Restricted backend API binding exclusively to `127.0.0.1` and added `TrustedHostMiddleware` protection.
+* **Unsafe Job Arguments**: Hardened the Maintenance Job API to block execution of unsafe raw CLI arguments.
 
-*(Note: rc1 is the currently validated release candidate. The final public GitHub release file may be published as `FaceRecognitionService-Setup-v1.0.0.exe` providing it is an exact byte-for-byte copy with a confirmed SHA256 match. No rebuild was performed; this is a byte-for-byte copy of the validated artifact).*
+## 2. Stability and safety
+* Cleaned up frontend React async test warnings for smoother UI stability.
+* Eliminated noisy Pydantic V2 deprecation warnings in the backend logs.
 
-## 💻 System Requirements
-1. **Microsoft .NET 10 Desktop Runtime (x64)** (The installer will prompt you if missing).
-2. **Microsoft Edge WebView2 Runtime** (Pre-installed on Windows 11; installer will prompt if missing).
-3. **NVIDIA GPU (Optional)**: Automatically falls back to CPU if a CUDA GPU is not available. No separate CUDA Toolkit installation is required.
+## 3. Performance
+* **Job List I/O Bound**: Significantly optimized maintenance job listing I/O by parsing only the latest 100 historical logs. This completely resolves CPU and disk spikes during heavy API polling.
+* **Startup Delays**: Optimized desktop-to-backend startup wait boundaries for snappier loading times.
 
-## 📥 Installation Steps
-1. Download the validated installer `FaceRecognitionService-Setup-v1.0.0-rc1.exe`.
-2. Run the executable to install the application. It will install automatically to `%LOCALAPPDATA%\Programs\Face Recognition Service`.
-3. Launch "Face Recognition Service" from your Start Menu.
-4. On your very first run, you will see a **Configuration Required** screen.
+## 4. Testing and QA
+* Added complete backend FastAPI TestClient route tests.
+* Established a solid minimal frontend test foundation utilizing Vitest.
+* Established a comprehensive desktop xUnit test foundation.
 
-## ⚙️ First-Run Setup Steps
-1. Open the **Settings** menu.
-2. Configure your external data directories. Expected production paths:
-   - Base Directory: `D:\FaceService`
-   - Actors Directory: `D:\FaceService\actors`
-   - Models Directory: `D:\FaceService\models`
-   - FAISS Index Directory: `D:\FaceService\data\faiss_index`
-   - Videos Directory: `D:\Videos`
-3. Click **Validate**. If validation succeeds, click **Save** and restart the app when prompted.
-4. The backend should successfully load and display: `Model Ready`, indicating the AI has initialized.
+## 5. Developer workflow
+* Integrated `docker-test.ps1` helper for running full offline Docker maintenance smoke fixtures, dramatically speeding up verification of indexing and job processing logic.
 
-## 🔄 Upgrades & Uninstallation
-- **Upgrades**: `config.json` is safely preserved during reinstalls/upgrades. `config.example.json` is automatically refreshed to ensure you have the latest template schema.
-- **Uninstallation**: Uninstalling via the Windows Control Panel removes the program files. Your `config.json`, logs, and external ML models/videos are completely safe and untouched.
+## 6. Windows 11 policy
+* Explicitly dropped Windows 10 and older compatibility files and dependencies. Windows 11 is required.
 
-## ⚠️ Known Issues
-- **Jobs UI Delay**: The Job Status UI can briefly display `FAILED` before updating to `COMPLETED` for long-running dry-run tasks.
-- **Validation Message**: If an external path is missing, the Settings validation message simply says "Base directory not found at " rather than explicitly stating it is unconfigured.
-- **StashDB API Warning**: You may see a `StashDB API key is not configured` warning. This is purely optional and non-blocking unless you intend to scrape actor profiles.
+## 7. Removed legacy items
+* Removed obsolete standalone scripts (`start_service.py`, `scraper_ui.py`) and their batch wrappers. Their functionality is completely superseded by the desktop shell and modern maintenance jobs UI.
 
-## 🧪 Validated Test Matrix
-| Scenario | Result | Notes |
-|----------|--------|-------|
-| Clean Windows 11 VM | **PASSED** | App correctly starts in Setup Mode with safe empty defaults. |
-| Configured Hardware (GPU) | **PASSED** | Correctly hooks to external drives, initializes CUDA models, and FAISS vector matching functions accurately. |
-| Process Lifecycle | **PASSED** | No orphaned `python.exe` or `FaceBackend.exe` remains after UI closure. |
+## 8. Validation
+The codebase successfully passes all matrix tests:
+* Python `unittest` suite (backend).
+* `docker-test.ps1` (offline smoke fixtures).
+* Vite build and `vitest` suite (frontend).
+* `dotnet test` suite (WPF desktop shell).
+
+## 9. Known notes
+* **OS Support**: Windows 11 is required. Windows 10 and older are not supported.
+* **WebView2**: Microsoft Edge WebView2 Runtime is required to launch the application.
+* **Packaging**: Inno Setup installer and portable packages remain the supported distribution methods. MSIX remains cancelled and is not planned.
+* Final installer/portable SHA256 checksums will be filled and published after artifact build.
+
+---
+
+### Artifacts (Pending Build)
+
+* Installer: `FaceRecognitionService-Setup-v1.0.2-release.exe`
+* Installer Checksum: `FaceRecognitionService-Setup-v1.0.2-release.sha256`
+* Portable Archive: `FaceRecognitionService-Portable-v1.0.2-release.zip`
+* Portable Checksum: `FaceRecognitionService-Portable-v1.0.2-release.sha256`

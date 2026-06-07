@@ -319,7 +319,7 @@ class MaintenanceHotfixTests(unittest.TestCase):
         self.assertNotIn("--confirm-large-delete", source)
         self.assertNotIn("--allow-unvalidated-images", source)
         self.assertIn(
-            "Face Recognition Service v1.0.1",
+            "Face Recognition Service v1.0.2",
             Path("frontend/src/lib/uiPreferences.tsx").read_text(encoding="utf-8"),
         )
 

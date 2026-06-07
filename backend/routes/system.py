@@ -150,7 +150,7 @@ def system_status() -> dict[str, Any]:
         "status": overall,
         "service": {
             "name": "Face Recognition Service",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "python": sys.version.split()[0],
             "pid": os.getpid(),
         },
