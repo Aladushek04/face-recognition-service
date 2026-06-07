@@ -58,7 +58,7 @@ Tasks:
 
 Acceptance criteria:
 
-- The service runs via `start_service`.
+- The service runs via the Desktop Shell.
 - Browser UI works at `http://127.0.0.1:3000`.
 - Backend health works at `http://127.0.0.1:8000/api/health`.
 - Rebuild index, repair empty actors, cleanup, and video reanalysis are usable

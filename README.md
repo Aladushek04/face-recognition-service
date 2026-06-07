@@ -89,18 +89,13 @@ FAISS_INDEX_DIR=D:\FaceService\data\faiss_index
 VIDEOS_DIR=D:\Videos
 ```
 
-5. Запустите сервис через helper-скрипт (стартует backend и frontend):
-```powershell
-.\start_service.bat
-```
-- Web UI: `http://127.0.0.1:3000`
-- API: `http://127.0.0.1:8000`
-- API docs: `http://127.0.0.1:8000/docs`
-
-6. Или запустите WPF Desktop Shell:
+5. Запустите WPF Desktop Shell:
 ```powershell
 dotnet run --project desktop\wpf\FaceRecognition.Desktop\FaceRecognition.Desktop.csproj
 ```
+- Web UI: `http://127.0.0.1:3000` (если запущен Docker или frontend отдельно)
+- API: `http://127.0.0.1:8000`
+- API docs: `http://127.0.0.1:8000/docs`
 
 ### Конфигурация `.env` (Source)
 
@@ -180,20 +175,7 @@ python scripts\build_index.py --refresh-cache
 STASHDB_API_KEY=your-token-here
 ```
 
-Одиночный импорт доступен в UI через поиск StashDB. Массовый импорт удобнее запускать через меню:
-
-```powershell
-.\scrapper.bat
-```
-
-Меню умеет:
-
-- `Scrape StashDB`: импорт новых актеров.
-- `Backfill metadata`: обновить StashDB-метаданные у существующих записей.
-- `Cleanup actors`: preview/apply очистки актеров по фильтрам.
-- `Cleanup photos`: preview/apply очистки плохих reference-фото.
-- `Build face index`: пересборка FAISS.
-- `Index status`: счетчики базы и индекс-файлов.
+Одиночный импорт доступен в UI через поиск StashDB. Массовый импорт и другие операции очистки удобнее запускать через раздел Maintenance Jobs в приложении.
 
 Прямой запуск скраппера:
 
