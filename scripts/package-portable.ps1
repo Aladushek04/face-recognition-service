@@ -4,6 +4,7 @@ Param(
     [string]$Runtime = "cpu",
     [string]$Version = "v1.0.2",
     [string]$ReleaseName = "",
+    [string]$OutputDir = "",
     [string]$OutputRoot = "",
     [switch]$Force = $false,
     [switch]$DryRun = $false
@@ -34,7 +35,21 @@ if ([string]::IsNullOrWhiteSpace($ReleaseName)) {
     $ReleaseName = "$ReleaseName-$Runtime"
 }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $RepoRoot "releases"
+    $OutputRoot = $OutputDir
+} elseif (-not [string]::IsNullOrWhiteSpace($OutputDir) -and
+          -not $OutputRoot.Equals($OutputDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-Error "Use either -OutputDir or -OutputRoot, not both with different values."
+}
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $ResolvedOutputDir = Join-Path $RepoRoot "releases"
+} else {
+    $ResolvedOutputDir = [System.IO.Path]::GetFullPath($OutputRoot)
+}
+
+$ForbiddenInstallerDir = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller")
+if ($ResolvedOutputDir.Equals($ForbiddenInstallerDir, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $ResolvedOutputDir.StartsWith("$ForbiddenInstallerDir\", [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-Error "Refusing to write packaging output to protected release directory: $ForbiddenInstallerDir"
 }
 
 Write-Host "--- Packaging Portable Release ---"
@@ -42,7 +57,7 @@ Write-Host "RepoRoot: $RepoRoot"
 Write-Host "Runtime: $Runtime"
 Write-Host "Version: $Version"
 Write-Host "ReleaseName: $ReleaseName"
-Write-Host "OutputRoot: $OutputRoot"
+Write-Host "OutputDir: $ResolvedOutputDir"
 
 # 1. Build packaged backend
 $BuildBackendScript = Join-Path $RepoRoot "scripts\build-backend.ps1"
@@ -64,7 +79,7 @@ if (-not $TargetFramework) { $TargetFramework = "net10.0-windows" }
 $PublishOutputDir = Join-Path $WpfDir "bin\Release\$TargetFramework\publish"
 
 # 4. Create output directory
-$ReleasesDir = $OutputRoot
+$ReleasesDir = $ResolvedOutputDir
 $ReleaseTargetDir = Join-Path $ReleasesDir $ReleaseName
 $ZipPath = Join-Path $ReleasesDir "$ReleaseName.zip"
 $ChecksumPath = "$ZipPath.sha256"

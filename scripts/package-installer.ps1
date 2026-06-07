@@ -3,6 +3,7 @@ param (
     [ValidateSet("cpu", "gpu")]
     [string]$Runtime = "cpu",
     [string]$Version = "v1.0.2",
+    [string]$OutputDir = "",
     [switch]$NoBuild = $false,
     [switch]$DryRun = $false
 )
@@ -10,12 +11,25 @@ param (
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$RepoRoot = Resolve-Path "$PSScriptRoot\.."
-$ReleasesDir = "$RepoRoot\releases"
+$RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path
+$DefaultOutputDir = Join-Path $RepoRoot "releases"
 $PublishOutputDir = "$RepoRoot\desktop\wpf\FaceRecognition.Desktop\bin\Release\net10.0-windows\publish"
 $BuildBackendScript = "$PSScriptRoot\build-backend.ps1"
 $PublishDesktopScript = "$RepoRoot\desktop\wpf\FaceRecognition.Desktop\scripts\publish-desktop.ps1"
 $IssScript = "$PSScriptRoot\FaceRecognitionService.iss"
+$CustomOutputDir = -not [string]::IsNullOrWhiteSpace($OutputDir)
+
+if ($CustomOutputDir) {
+    $ResolvedOutputDir = [System.IO.Path]::GetFullPath($OutputDir)
+} else {
+    $ResolvedOutputDir = $DefaultOutputDir
+}
+
+$ForbiddenInstallerDir = [System.IO.Path]::GetFullPath("F:\VMShare\FaceRecognitionInstaller")
+if ($ResolvedOutputDir.Equals($ForbiddenInstallerDir, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $ResolvedOutputDir.StartsWith("$ForbiddenInstallerDir\", [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-Error "Refusing to write packaging output to protected release directory: $ForbiddenInstallerDir"
+}
 
 $VersionLabel = $Version.Trim()
 if ([string]::IsNullOrWhiteSpace($VersionLabel)) {
@@ -29,18 +43,24 @@ if ($VersionLabel.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase))
 }
 
 $OutputBaseFilename = "FaceRecognitionService-Setup-$VersionLabel-$Runtime"
-$ExpectedInstallerPath = Join-Path $ReleasesDir "$OutputBaseFilename.exe"
+$ExpectedInstallerPath = Join-Path $ResolvedOutputDir "$OutputBaseFilename.exe"
 $InnoDefineArgs = @(
     "/DAppVersion=$AppVersion",
     "/DOutputBaseFilename=$OutputBaseFilename",
     "/DPackageRuntime=$Runtime"
 )
+$InnoCompileArgs = @()
+if ($CustomOutputDir) {
+    $InnoCompileArgs += "/O$ResolvedOutputDir"
+}
+$InnoCompileArgs += $InnoDefineArgs
 
 Write-Host "--- Packaging Installer ---"
 Write-Host "RepoRoot: $RepoRoot"
 Write-Host "Runtime: $Runtime"
 Write-Host "Version: $VersionLabel"
 Write-Host "AppVersion: $AppVersion"
+Write-Host "OutputDir: $ResolvedOutputDir"
 Write-Host "OutputBaseFilename: $OutputBaseFilename"
 Write-Host "Expected installer: $ExpectedInstallerPath"
 
@@ -53,13 +73,17 @@ if ($DryRun) {
         Write-Host "Backend build: powershell -ExecutionPolicy Bypass -File `"$BuildBackendScript`" -Runtime $Runtime"
         Write-Host "Desktop publish: powershell -ExecutionPolicy Bypass -File `"$PublishDesktopScript`" -IncludeBackend"
     }
-    Write-Host "Inno compile: ISCC $($InnoDefineArgs -join ' ') `"$IssScript`""
+    Write-Host "Inno compile: ISCC $($InnoCompileArgs -join ' ') `"$IssScript`""
     exit 0
 }
 
-# Ensure releases directory exists
-if (-not (Test-Path $ReleasesDir)) {
-    New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
+if ($CustomOutputDir -and (Test-Path $ExpectedInstallerPath)) {
+    Write-Error "Installer output already exists. Refusing to overwrite: $ExpectedInstallerPath"
+}
+
+# Ensure output directory exists
+if (-not (Test-Path $ResolvedOutputDir)) {
+    New-Item -ItemType Directory -Path $ResolvedOutputDir | Out-Null
 }
 
 # 1. Build Backend
@@ -94,7 +118,7 @@ if (-not (Test-Path $InnoPath)) {
 
 # 3. Compile the Inno Setup Script
 Write-Host "Compiling Inno Setup Script: $IssScript"
-& $InnoPath @InnoDefineArgs $IssScript
+& $InnoPath @InnoCompileArgs $IssScript
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE."
