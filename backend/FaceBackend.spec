@@ -9,15 +9,10 @@ required_dlls = [
     'cudnn64_9.dll',
     'cudnn_engines_runtime_compiled64_9.dll',
     'cudnn_engines_precompiled64_9.dll',
-    'cudnn_ops64_9.dll',
     'cudnn_cnn64_9.dll',
     'cudnn_adv64_9.dll',
-    'cudnn_graph64_9.dll',
     'cudnn_heuristic64_9.dll',
-    'onnxruntime_providers_cuda.dll',
-    'onnxruntime_providers_shared.dll',
     'cublas64_12.dll',
-    'cublasLt64_12.dll',
     'cudart64_12.dll',
 ]
 
@@ -77,6 +72,28 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+package_collected_dlls = {
+    'nvidia\\cublas\\bin\\cublaslt64_12.dll',
+    'nvidia\\cudnn\\bin\\cudnn_graph64_9.dll',
+    'nvidia\\cudnn\\bin\\cudnn_ops64_9.dll',
+    'onnxruntime\\capi\\onnxruntime_providers_cuda.dll',
+    'onnxruntime\\capi\\onnxruntime_providers_shared.dll',
+}
+collected_targets = {
+    target.replace('/', '\\').lower()
+    for target, _, _ in a.binaries
+}
+root_duplicate_dlls = {
+    target.rsplit('\\', 1)[-1]
+    for target in package_collected_dlls
+    if target in collected_targets
+}
+a.binaries = [
+    binary
+    for binary in a.binaries
+    if binary[0].replace('/', '\\').lower() not in root_duplicate_dlls
+]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
